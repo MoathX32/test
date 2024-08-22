@@ -22,10 +22,13 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
-# Global stores
-vector_stores = {}
-reference_texts_store = {}
-document_store = []
+# Initialize session state if not already done
+if "vector_stores" not in st.session_state:
+    st.session_state.vector_stores = {}
+if "reference_texts_store" not in st.session_state:
+    st.session_state.reference_texts_store = {}
+if "document_store" not in st.session_state:
+    st.session_state.document_store = []
 
 # Constants
 FOLDER_PATH = "Data"  # Fixed folder path
@@ -145,31 +148,46 @@ def get_playlist_videos(playlist_id):
 # Streamlit App
 st.title("PDF and Video Processing App")
 
-# Sidebar Navigation
-page = st.sidebar.selectbox("Choose a function", ["Process PDFs and Videos", "Generate Response", "Generate Reference Texts", "Generate Video Segment URLs", "Generate Questions"])
+# Sidebar Buttons
+st.sidebar.title("Navigation")
+if st.sidebar.button("Process PDFs and Videos"):
+    st.session_state.current_page = "Process PDFs and Videos"
+if st.sidebar.button("Generate Response"):
+    st.session_state.current_page = "Generate Response"
+if st.sidebar.button("Generate Reference Texts"):
+    st.session_state.current_page = "Generate Reference Texts"
+if st.sidebar.button("Generate Video Segment URLs"):
+    st.session_state.current_page = "Generate Video Segment URLs"
+if st.sidebar.button("Generate Questions"):
+    st.session_state.current_page = "Generate Questions"
 
-if page == "Process PDFs and Videos":
+# Default page
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "Process PDFs and Videos"
+
+# Page Routing
+if st.session_state.current_page == "Process PDFs and Videos":
     st.header("Process PDFs and Videos")
     if st.button("Process"):
         pdf_docs_with_names = read_files_from_folder(FOLDER_PATH)
         documents = get_all_pdfs_chunks(pdf_docs_with_names)
         pdf_vectorstore = get_vector_store(documents)
         playlist_id = PLAYLIST_URL.split("list=")[-1].split("&")[0]
-        vector_stores["pdf_vectorstore"] = pdf_vectorstore
-        vector_stores["playlist_id"] = playlist_id
-        document_store.extend(documents)
+        st.session_state.vector_stores["pdf_vectorstore"] = pdf_vectorstore
+        st.session_state.vector_stores["playlist_id"] = playlist_id
+        st.session_state.document_store.extend(documents)
         st.success("PDFs and playlist processed successfully!")
 
-elif page == "Generate Response":
+elif st.session_state.current_page == "Generate Response":
     st.header("Generate Response")
     query = st.text_input("Enter your query:")
     if st.button("Generate"):
-        if "pdf_vectorstore" not in vector_stores:
+        if "pdf_vectorstore" not in st.session_state.vector_stores:
             st.error("PDFs must be processed first.")
         else:
-            pdf_vectorstore = vector_stores['pdf_vectorstore']
+            pdf_vectorstore = st.session_state.vector_stores['pdf_vectorstore']
             relevant_content = pdf_vectorstore.similarity_search(query, k=20)
-            vector_stores["relevant_content"] = relevant_content
+            st.session_state.vector_stores["relevant_content"] = relevant_content
             context = " ".join([doc.page_content for doc in relevant_content])
             model = genai.GenerativeModel(
                 model_name="gemini-1.5-pro-latest",
@@ -177,32 +195,32 @@ elif page == "Generate Response":
                 system_instruction="You are a helpful document answering assistant."
             )
             response = get_response(context, query, model)
-            vector_stores["response_text"] = response
+            st.session_state.vector_stores["response_text"] = response
             st.write(response)
 
-elif page == "Generate Reference Texts":
+elif st.session_state.current_page == "Generate Reference Texts":
     st.header("Generate Reference Texts")
     if st.button("Generate"):
-        if "pdf_vectorstore" not in vector_stores or "response_text" not in vector_stores or "relevant_content" not in vector_stores:
+        if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
             st.error("PDFs, response, and relevant content must be processed first.")
         else:
-            response_text = vector_stores['response_text']
-            context = " ".join([doc.page_content for doc in vector_stores["relevant_content"]])
+            response_text = st.session_state.vector_stores['response_text']
+            context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
             reference_texts = extract_reference_texts_as_json(response_text, context)
             if reference_texts is None:
                 st.warning("No relevant reference texts found.")
             else:
-                reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
+                st.session_state.reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
                 st.json(reference_texts)
 
-elif page == "Generate Video Segment URLs":
+elif st.session_state.current_page == "Generate Video Segment URLs":
     st.header("Generate Video Segment URLs")
     if st.button("Generate"):
-        if "playlist_id" not in vector_stores or "last_reference_texts" not in reference_texts_store:
+        if "playlist_id" not in st.session_state.vector_stores or "last_reference_texts" not in st.session_state.reference_texts_store:
             st.error("Playlist and reference texts must be processed first.")
         else:
-            playlist_id = vector_stores["playlist_id"]
-            reference_texts = reference_texts_store["last_reference_texts"]
+            playlist_id = st.session_state.vector_stores["playlist_id"]
+            reference_texts = st.session_state.reference_texts_store["last_reference_texts"]
             filenames = [ref["filename"] for ref in reference_texts["reference_texts"]]
             videos = get_playlist_videos(playlist_id)
             relevant_video_urls = {}
@@ -216,12 +234,12 @@ elif page == "Generate Video Segment URLs":
             else:
                 st.warning("No matching video found for lessons.")
 
-elif page == "Generate Questions":
+elif st.session_state.current_page == "Generate Questions":
     st.header("Generate Questions")
     question_type = st.selectbox("Select question type", ["MCQ", "True/False"])
     questions_number = st.number_input("Number of questions", min_value=1, max_value=10, step=1)
     if st.button("Generate"):
-        if "last_reference_texts" not in reference_texts_store:
+        if "last_reference_texts" not in st.session_state.reference_texts_store:
             st.error("No reference texts found. Please process the reference texts first.")
         else:
             model = genai.GenerativeModel(
@@ -229,7 +247,7 @@ elif page == "Generate Questions":
                 generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000},
                 system_instruction="You are a helpful document answering assistant."
             )
-            relevant_texts = " ".join([ref["relevant_texts"] for ref in reference_texts_store["last_reference_texts"]["reference_texts"]])
+            relevant_texts = " ".join([ref["relevant_texts"] for ref in st.session_state.reference_texts_store["last_reference_texts"]["reference_texts"]])
             questions_json = generate_questions(
                 relevant_text=relevant_texts,
                 num_questions=questions_number,

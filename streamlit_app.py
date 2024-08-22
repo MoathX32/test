@@ -74,17 +74,30 @@ def get_vector_store(documents):
 
 # Function to generate responses
 # Function to generate responses with both study assistance and general chat capabilities
+# Function to generate responses with both study assistance and general chat capabilities
 def get_response(context, question, model):
     # Initialize chat history if not already present
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+
+    # Ensure chat history entries are correctly formatted
+    formatted_history = []
+    for entry in st.session_state.chat_history:
+        formatted_history.append({
+            "author": "user",
+            "content": entry["question"]
+        })
+        formatted_history.append({
+            "author": "bot",
+            "content": entry["response"]
+        })
 
     # Check if the question is related to the study content or a general chat
     is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
 
     if is_study_related:
         # Study-related response using the provided context
-        chat_session = model.start_chat(history=st.session_state.chat_history)
+        chat_session = model.start_chat(history=formatted_history)
         prompt_template = """
         أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. مهمتك هي مساعدة الطلاب على فهم الدروس والإجابة على أسئلتهم باستخدام المعلومات الموجودة في الدروس فقط.
         استخدم النص الموجود في السياق المرجعي أدناه للإجابة على السؤال. إذا لم تتمكن من العثور على إجابة في النص، أخبر المستخدم أنك غير قادر على الإجابة بناءً على المعلومات المتاحة.
@@ -93,7 +106,7 @@ def get_response(context, question, model):
         """
     else:
         # General chat response
-        chat_session = model.start_chat(history=st.session_state.chat_history)
+        chat_session = model.start_chat(history=formatted_history)
         prompt_template = """
         أنت مساعد دردشة ذكي. يمكنك الدردشة مع الطالب والإجابة على أي أسئلة عامة أو بدء محادثة ودية.
         السؤال: {question}\n
@@ -112,7 +125,6 @@ def get_response(context, question, model):
             return response_text
     except Exception as e:
         return "حدث خطأ أثناء محاولة الإجابة على سؤالك. من فضلك حاول مرة أخرى لاحقًا."
-
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""

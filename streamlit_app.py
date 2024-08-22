@@ -465,9 +465,15 @@ st.write("")
 st.write("")
 st.write("")
 
-
-# استخدام st.button مع نفس النص لتقديم نفس الوظيفة
+# زر "ابدأ تشغيل المساعد"
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
+    # إعادة تعيين المتغيرات في session_state لمسح سجل الدردشة
+    st.session_state.vector_stores = {}
+    st.session_state.reference_texts_store = {}
+    st.session_state.document_store = []
+    st.session_state.response_submitted = False
+    st.session_state.sources_shown = False
+
     with st.spinner('جاري معالجة الملفات...'):
        process_lessons_and_video()  # استدعاء الدالة لمعالجة الملفات
     st.session_state.processing_complete = True  # تحديث حالة المعالجة

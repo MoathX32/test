@@ -231,10 +231,6 @@ def generate_questions_endpoint():
         # Generate questions based on the relevant texts
         questions_json = generate_questions(import json
 
-import json
-import streamlit as st
-import google.generativeai as genai
-
 # Other imports if needed
 
 def generate_questions_endpoint():

@@ -169,68 +169,6 @@ def extract_reference_texts_as_json(response_text, context):
         logging.error(f"Error parsing reference texts JSON: {str(e)}")
         return None
 
-
-
-def generate_questions_endpoint():
-    if "last_reference_texts" not in st.session_state.reference_texts_store:
-        st.error("No reference texts found. Please process the reference texts first.")
-        return
-
-    try:
-        # Retrieve the reference texts safely
-        last_reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
-        reference_texts = last_reference_texts.get("reference_texts", [])
-
-        # Debugging: Output the structure of reference_texts
-        st.write("Debug: Reference Texts Structure:", reference_texts)
-
-        # Check if reference_texts is a string (indicating it might be a JSON string)
-        if isinstance(reference_texts, str):
-            try:
-                # Attempt to parse the string as JSON
-                reference_texts = json.loads(reference_texts)
-            except json.JSONDecodeError:
-                st.error("Failed to parse reference_texts as JSON.")
-                return
-
-        # Ensure reference_texts is now a list
-        if not isinstance(reference_texts, list):
-            st.error("reference_texts is not a valid list after parsing.")
-            return
-
-        # Initialize an empty list to store valid 'relevant_texts'
-        relevant_texts_list = []
-
-        # Iterate through reference_texts to extract 'relevant_texts'
-        for ref in reference_texts:
-            # Check if the entry is a dictionary and contains 'relevant_texts'
-            if isinstance(ref, dict) and "relevant_texts" in ref:
-                relevant_texts_list.append(ref["relevant_texts"])
-            else:
-                st.warning(f"Skipping invalid or incomplete reference text entry: {ref}")
-
-        # Join all relevant texts into a single string
-        relevant_texts = " ".join(relevant_texts_list)
-
-        # Ensure we have valid relevant texts before proceeding
-        if not relevant_texts.strip():
-            st.error("No valid reference texts available for generating questions.")
-            return
-
-        # Create the model instance
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro-latest",
-            generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000},
-            system_instruction="You are a helpful document answering assistant."
-        )
-
-        # Get user input for question generation
-        questions_number = st.number_input("Number of questions", min_value=1, max_value=10, step=1)
-        question_type = st.selectbox("Select question type", ["MCQ", "True/False"])
-
-        # Generate questions based on the relevant texts
-        questions_json = generate_questions(import json
-
 # Other imports if needed
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:

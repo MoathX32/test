@@ -429,6 +429,9 @@ if "processing_complete" not in st.session_state:
 if "response_submitted" not in st.session_state:
     st.session_state.response_submitted = False
 
+if "sources_shown" not in st.session_state:
+    st.session_state.sources_shown = False
+
 # عنوان الصفحة
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
@@ -478,30 +481,35 @@ if st.session_state.processing_complete:
             st.write("الرد:", response)
             st.session_state.response_submitted = True  # تحديث حالة تقديم الرد
 
-st.write("---")
-
-# إظهار العناصر التالية فقط بعد تقديم الرد
-if st.session_state.response_submitted:
-    # زر لعرض النصوص المرجعية
-    if st.session_state.get("vector_stores") and st.button("المصادر"):
-        reference_texts = generate_reference_texts()
-        st.write("النصوص من الكتاب:", reference_texts)
-
     st.write("---")
 
-    # نموذج لإنشاء الأسئلة
-    with st.form(key='questions_form'):
-        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-        questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=10)
-        generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+    # إظهار زر المصادر فقط بعد تقديم الرد
+    if st.session_state.response_submitted:
+        if st.session_state.get("vector_stores") and st.button("المصادر"):
+            reference_texts = generate_reference_texts()
+            st.write("النصوص من الكتاب:", reference_texts)
+            st.session_state.sources_shown = True  # تحديث حالة عرض المصادر
 
-        if generate_questions_button:
-            question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-            questions = generate_questions_endpoint(question_request)
-            st.write("الاختبار:", questions)
+        st.write("---")
 
-    # زر لتوليد روابط مقاطع الفيديو
-    if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
-        video_segment_urls = generate_video_segment_url()
-        st.write("Generated Video Segment URLs:", video_segment_urls)
+        # إظهار باقي العناصر بعد عرض المصادر
+        if st.session_state.sources_shown:
+            # نموذج لإنشاء الأسئلة
+            with st.form(key='questions_form'):
+                question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+                questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=10)
+                generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+
+                if generate_questions_button:
+                    question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+                    questions = generate_questions_endpoint(question_request)
+                    st.write("الاختبار:", questions)
+
+            st.write("---")
+
+            # زر لتوليد روابط مقاطع الفيديو
+            if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
+                video_segment_urls = generate_video_segment_url()
+                st.write("Generated Video Segment URLs:", video_segment_urls)
+
 

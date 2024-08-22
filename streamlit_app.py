@@ -177,8 +177,12 @@ def generate_questions_endpoint():
         return
 
     try:
+        # Retrieve the reference texts
         last_reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
         reference_texts = last_reference_texts.get("reference_texts", [])
+
+        # Debugging: Output the structure of reference_texts
+        st.write("Reference Texts:", reference_texts)
 
         # Ensure that reference_texts is a list and contains dictionaries with 'relevant_texts' keys
         if not isinstance(reference_texts, list):

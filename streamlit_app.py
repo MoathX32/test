@@ -464,15 +464,6 @@ st.write("")
 st.write("")
 st.write("")
 
-# استخدام st.markdown لتوسيط الزر أفقياً
-st.markdown(
-    """
-    <div style="display: flex; justify-content: center;">
-        <button style="font-size:24px; padding:20px 40px;">🚀 ابدأ تشغيل المساعد 🚀</button>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 # استخدام st.button مع نفس النص لتقديم نفس الوظيفة
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):

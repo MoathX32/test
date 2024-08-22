@@ -129,20 +129,18 @@ def get_response(context, question, model):
         st.error(f"Exception occurred: {str(e)}")
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
 
-
-
-
-# Function to extract reference texts as JSON
-def extract_reference_texts_as_json(response_text, context):
+# Function to extract reference texts as plain text
+def extract_reference_texts_as_text(response_text, context):
     ref_prompt = f"""
     بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية، والتي يجب أن تتضمن عناوين دروس مثل "درس: قواعد اللغة العربية" أو "درس: أدب العصر العباسي".
-    قدم العنوان الرئيسي للدرس كمفتاح 'filename'، وأضف النص الأكثر ارتباطًا فقط تحت مفتاح 'relevant_texts'.
+    قدم العنوان الرئيسي للدرس متبوعًا بالنص الأكثر ارتباطًا فقط.
+    
     الإجابة: {response_text}
 
     ابحث في السياق المرجعي التالي عن المعلومات التي تدعم هذه الإجابة:
     {context}
 
-    قدم النص الأكثر ارتباطًا مع بيان مرجعه في شكل JSON كما هو موضح أعلاه.
+    قدم النص الأكثر ارتباطًا مع بيان مرجعه في شكل نص كما هو موضح أعلاه.
     """
 
     chat_session = genai.GenerativeModel(
@@ -158,24 +156,23 @@ def extract_reference_texts_as_json(response_text, context):
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
 
-    # Attempt to clean and parse the text as JSON
-    cleaned_text = re.sub(r'```json', '', ref_response_text).strip()
-    cleaned_text = re.sub(r'```', '', cleaned_text).strip()
-
+    # Extract the filename and relevant texts
+    extracted_texts = []
     try:
-        reference_texts_json = json.loads(cleaned_text)
-        return reference_texts_json
+        ref_data = json.loads(ref_response_text)
+        for item in ref_data:
+            filename = item.get("filename", "Unknown Lesson")
+            relevant_texts = item.get("relevant_texts", "")
+            extracted_texts.append(f"{filename}:\n{relevant_texts}")
     except json.JSONDecodeError as e:
         logging.error(f"Error parsing reference texts JSON: {str(e)}")
-        return None
+        return ref_response_text  # Return the raw text if JSON parsing fails
 
-# Other imports if needed
+    # Combine all extracted texts into a single string
+    final_text = "\n\n".join(extracted_texts)
+    return final_text
 
 # Function to generate questions
-import json
-import streamlit as st
-import google.generativeai as genai
-
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         st.error("No reference texts found. Please process the reference texts first.")
@@ -282,7 +279,6 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         st.error(f"Error: {e}")
         return None
 
-
 # Function to get playlist videos (mock implementation)
 def get_playlist_videos(playlist_id):
     # Mock implementation
@@ -355,12 +351,12 @@ elif st.session_state.current_page == "Generate Reference Texts":
         else:
             response_text = st.session_state.vector_stores['response_text']
             context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
-            reference_texts = extract_reference_texts_as_json(response_text, context)
-            if reference_texts is None:
+            reference_texts = extract_reference_texts_as_text(response_text, context)
+            if not reference_texts:
                 st.warning("No relevant reference texts found.")
             else:
                 st.session_state.reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
-                st.json(reference_texts)
+                st.text(reference_texts)
 
 elif st.session_state.current_page == "Generate Video Segment URLs":
     st.header("Generate Video Segment URLs")

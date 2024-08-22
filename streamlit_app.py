@@ -84,38 +84,40 @@ def get_response(context, question, model):
 
     # Ensure chat history entries are correctly formatted
     formatted_history = []
-    for entry in st.session_state.chat_history:
-        if "question" in entry and "response" in entry:
-            formatted_history.append({
-                "content": entry["question"],
-                "role": "user"
-            })
-            formatted_history.append({
-                "content": entry["response"],
-                "role": "assistant"
-            })
-
-    # Check if the question is related to the study content or a general chat
-    is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
-
-    if is_study_related:
-        # Study-related response using the provided context
-        chat_session = model.start_chat(history=formatted_history)
-        prompt_template = """
-        أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. مهمتك هي مساعدة الطلاب على فهم الدروس والإجابة على أسئلتهم باستخدام المعلومات الموجودة في الدروس فقط.
-        استخدم النص الموجود في السياق المرجعي أدناه للإجابة على السؤال. إذا لم تتمكن من العثور على إجابة في النص، أخبر المستخدم أنك غير قادر على الإجابة بناءً على المعلومات المتاحة.
-        السياق: {context}\n
-        السؤال: {question}\n
-        """
-    else:
-        # General chat response
-        chat_session = model.start_chat(history=formatted_history)
-        prompt_template = """
-        أنت مساعد دردشة ذكي. يمكنك الدردشة مع الطالب والإجابة على أي أسئلة عامة أو بدء محادثة ودية.
-        السؤال: {question}\n
-        """
-
     try:
+        for entry in st.session_state.chat_history:
+            if "question" in entry and "response" in entry:
+                formatted_history.append({
+                    "content": entry["question"],
+                    "role": "user"
+                })
+                formatted_history.append({
+                    "content": entry["response"],
+                    "role": "assistant"
+                })
+        # Debugging output to check the formatted history
+        st.write("Formatted History:", formatted_history)
+
+        # Check if the question is related to the study content or a general chat
+        is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
+
+        if is_study_related:
+            # Study-related response using the provided context
+            chat_session = model.start_chat(history=formatted_history)
+            prompt_template = """
+            أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. مهمتك هي مساعدة الطلاب على فهم الدروس والإجابة على أسئلتهم باستخدام المعلومات الموجودة في الدروس فقط.
+            استخدم النص الموجود في السياق المرجعي أدناه للإجابة على السؤال. إذا لم تتمكن من العثور على إجابة في النص، أخبر المستخدم أنك غير قادر على الإجابة بناءً على المعلومات المتاحة.
+            السياق: {context}\n
+            السؤال: {question}\n
+            """
+        else:
+            # General chat response
+            chat_session = model.start_chat(history=formatted_history)
+            prompt_template = """
+            أنت مساعد دردشة ذكي. يمكنك الدردشة مع الطالب والإجابة على أي أسئلة عامة أو بدء محادثة ودية.
+            السؤال: {question}\n
+            """
+
         response = chat_session.send_message(prompt_template.format(context=context if is_study_related else "", question=question))
         response_text = response.text.strip()
 
@@ -126,10 +128,16 @@ def get_response(context, question, model):
             return "أنا لا أستطيع الإجابة على هذا السؤال بناءً على المعلومات المتاحة في الدروس."
         else:
             return response_text
+
     except KeyError as e:
+        # Print detailed debug information for KeyError
+        st.error(f"KeyError: Missing key {str(e)}. Here’s the problematic entry: {entry}")
+        st.error(f"Formatted History: {formatted_history}")
         return f"Error: Missing key {str(e)} in the provided data. Please check the input format."
     except Exception as e:
+        st.error(f"Exception occurred: {str(e)}")
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
+
 
 # Function to extract reference texts as JSON
 def extract_reference_texts_as_json(response_text, context):

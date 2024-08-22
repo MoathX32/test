@@ -74,8 +74,6 @@ def get_vector_store(documents):
 
 # Function to generate responses
 # Function to generate responses with both study assistance and general chat capabilities
-# Function to generate responses with both study assistance and general chat capabilities
-# Function to generate responses with both study assistance and general chat capabilities
 def get_response(context, question, model):
     # Initialize chat history if not already present
     if "chat_history" not in st.session_state:
@@ -86,12 +84,12 @@ def get_response(context, question, model):
     for entry in st.session_state.chat_history:
         if "question" in entry and "response" in entry:
             formatted_history.append({
-                "author": "user",
-                "content": entry["question"]
+                "text": entry["question"],
+                "author": "user"
             })
             formatted_history.append({
-                "author": "bot",
-                "content": entry["response"]
+                "text": entry["response"],
+                "author": "bot"
             })
 
     # Check if the question is related to the study content or a general chat
@@ -127,6 +125,7 @@ def get_response(context, question, model):
             return response_text
     except Exception as e:
         return "حدث خطأ أثناء محاولة الإجابة على سؤالك. من فضلك حاول مرة أخرى لاحقًا."
+
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""

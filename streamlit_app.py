@@ -170,15 +170,21 @@ def extract_reference_texts_as_json(response_text, context):
         return None
 
 # Function to generate questions
+# Function to generate questions with improved error handling
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         st.error("No reference texts found. Please process the reference texts first.")
         return
 
     try:
-        reference_texts = st.session_state.reference_texts_store["last_reference_texts"]["reference_texts"]
+        last_reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
+        reference_texts = last_reference_texts.get("reference_texts", [])
 
-        # Ensure that each entry is a dictionary and has the 'relevant_texts' key
+        # Ensure that reference_texts is a list and contains dictionaries with 'relevant_texts' keys
+        if not isinstance(reference_texts, list):
+            st.error("Invalid format for reference texts. Expected a list.")
+            return
+
         relevant_texts = " ".join([ref.get("relevant_texts", "") for ref in reference_texts if isinstance(ref, dict)])
 
         if not relevant_texts.strip():
@@ -249,7 +255,7 @@ def get_playlist_videos(playlist_id):
     ]
 
 # Main App Interface
-st.title("PDF and Video Processing App")
+st.title("مرحبا ! انا مساعدك الذكي في ماددة اللغه العربيه للصف الرابع الابتدائي")
 
 # Button to show/hide navigation
 if st.button("Toggle Navigation"):
@@ -270,7 +276,7 @@ if st.session_state.navigation_visible:
 
 # Page Routing
 if st.session_state.current_page == "Process PDFs and Videos":
-    st.header("Process PDFs and Videos")
+    st.header("ابدأ")
     if st.button("Process"):
         pdf_docs_with_names = read_files_from_folder(FOLDER_PATH)
         documents = get_all_pdfs_chunks(pdf_docs_with_names)

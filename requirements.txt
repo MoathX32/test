@@ -5,3 +5,4 @@ langchain
 langchain-google-genai
 google-generativeai
 langchain_community
+faiss-gpu

@@ -25,6 +25,10 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
+# Initialize session state to keep track of the stage
+if "stage" not in st.session_state:
+    st.session_state.stage = 1
+
 # Initialize global stores
 if "vector_stores" not in st.session_state:
     st.session_state.vector_stores = {}
@@ -32,6 +36,9 @@ if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
+
+def next_stage():
+    st.session_state.stage += 1
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -86,7 +93,8 @@ def process_lessons_and_video():
 
     pdf_docs_with_names = read_files_from_folder(folder_path)
     if not pdf_docs_with_names or any(len(pdf) == 0 for pdf, _ in pdf_docs_with_names):
-        raise HTTPException(status_code=400, detail="One or more PDF files are empty.")
+        st.error("One or more PDF files are empty.")
+        return
 
     documents = get_all_pdfs_chunks(pdf_docs_with_names)
     pdf_vectorstore = get_vector_store(documents)
@@ -107,9 +115,9 @@ def get_response(context, question, model):
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
-    أجب على السؤال التالي باستخدام فهمك للنص الموجود في السياق المرجعي أدناه. قدم إجابة بسيطة وواضحة تتناسب مع مستوى الصفوف الأولى.
+    أجب على السؤال التالي باستخدام النص الموجود في السياق المرجعي أدناه فقط. قدم إجابة بسيطة وواضحة تتناسب مع مستوى الصفوف الأولى.
     يجب أن يكون الرد مختصرًا ومفهومًا.
-    لا تجب على أي سؤال خارج فهمك للنص النص.
+    لا تجب على أي سؤال خارج سياق النص.
     السياق: {context}\n
     السؤال: {question}\n
     """
@@ -133,7 +141,8 @@ def get_response(context, question, model):
 
 def generate_response(query_request: QueryRequest):
     if "pdf_vectorstore" not in st.session_state.vector_stores:
-        raise HTTPException(status_code=400, detail="PDFs must be processed first.")
+        st.error("PDFs must be processed first before generating a response.")
+        return
 
     pdf_vectorstore = st.session_state.vector_stores['pdf_vectorstore']
     
@@ -221,7 +230,8 @@ def extract_reference_texts_as_json(response_text, context):
 
 def generate_reference_texts():
     if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
-        raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
+        st.error("PDFs, response, and relevant content must be processed first.")
+        return None
     
     response_text = st.session_state.vector_stores['response_text']
     
@@ -300,11 +310,13 @@ def find_video_segment(filenames, response_text, playlist_id):
 def generate_video_segment_url():
     if "playlist_id" not in st.session_state.vector_stores or "last_reference_texts" not in st.session_state.reference_texts_store:
         logging.error("Required data not found: playlist_id or last_reference_texts.")
-        raise HTTPException(status_code=400, detail="Playlist and reference texts must be processed first.")
+        st.error("Playlist and reference texts must be processed first.")
+        return None
     
     if st.session_state.reference_texts_store.get("last_reference_texts") is None:
         logging.error("Cannot generate video segment URLs because reference texts are None.")
-        raise HTTPException(status_code=400, detail="Reference texts are None. Cannot generate video segment URLs.")
+        st.error("Reference texts are None. Cannot generate video segment URLs.")
+        return None
 
     playlist_id = st.session_state.vector_stores.get("playlist_id")
     reference_texts = st.session_state.reference_texts_store.get("last_reference_texts")
@@ -320,7 +332,8 @@ def generate_video_segment_url():
     
     if not video_segment_urls:
         logging.error(f"Video segments not found for lessons: {filenames}.")
-        raise HTTPException(status_code=404, detail="Not Found")
+        st.error("Video segments not found for lessons.")
+        return None
 
     return video_segment_urls
 
@@ -355,7 +368,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
-        logging.info(f"Model Response: {response_text}")  # Log the model's response
+        logging.info(f"Model Response: {response_text}")  # Logging model response
 
         if response_text:
             response_json = clean_json_response(response_text)
@@ -374,14 +387,15 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         st.error(f"Error generating questions: {e}")
         return None
 
-
 def generate_questions_endpoint(question_request: QuestionRequest):
     if "last_reference_texts" not in st.session_state.reference_texts_store:
-        raise HTTPException(status_code=400, detail="No reference texts found. Please process the reference texts first.")
+        st.error("No reference texts found. Please process the reference texts first.")
+        return None
     
     if st.session_state.reference_texts_store.get("last_reference_texts") is None:
         logging.error("Cannot generate questions because reference texts are None.")
-        raise HTTPException(status_code=400, detail="Reference texts are None. Cannot generate questions.")
+        st.error("Reference texts are None. Cannot generate questions.")
+        return None
 
     generation_config = {
         "temperature": 0.2,
@@ -419,38 +433,60 @@ def get_playlist_videos(playlist_id):
 # Streamlit UI Components
 st.title("Educational Content Processing and Question Generation App")
 
-if st.button('Process Lessons and Videos'):
-    process_lessons_and_video()
+# Stage 1: Process PDFs and Videos
+if st.session_state.stage == 1:
+    st.header("Stage 1: Process Lessons and Videos")
+    process_button = st.button("Process Lessons and Videos")
+    if process_button:
+        process_lessons_and_video()
+        next_stage_button = st.button("Next")
+        if next_stage_button:
+            next_stage()
 
-st.write("---")
+# Stage 2: Generate Response
+if st.session_state.stage == 2:
+    st.header("Stage 2: Generate Response")
+    with st.form(key='response_form'):
+        query = st.text_input("Enter your query:")
+        response_button = st.form_submit_button(label='Generate Response')
 
-with st.form(key='response_form'):
-    query = st.text_input("Enter your query:")
-    response_button = st.form_submit_button(label='Generate Response')
+        if response_button:
+            query_request = QueryRequest(query=query)
+            response = generate_response(query_request)
+            st.write("Generated Response:", response)
+            next_stage_button = st.button("Next")
+            if next_stage_button:
+                next_stage()
 
-    if response_button:
-        query_request = QueryRequest(query=query)
-        response = generate_response(query_request)
-        st.write("Generated Response:", response)
+# Stage 3: Generate Reference Texts
+if st.session_state.stage == 3:
+    st.header("Stage 3: Generate Reference Texts")
+    if st.button("Generate Reference Texts"):
+        reference_texts = generate_reference_texts()
+        st.write("Generated Reference Texts:", reference_texts)
+        next_stage_button = st.button("Next")
+        if next_stage_button:
+            next_stage()
 
-st.write("---")
+# Stage 4: Generate Questions
+if st.session_state.stage == 4:
+    st.header("Stage 4: Generate Questions")
+    with st.form(key='questions_form'):
+        question_type = st.selectbox("Select question type:", ["MCQ", "True/False"])
+        questions_number = st.number_input("Enter number of questions:", min_value=1, max_value=10)
+        generate_questions_button = st.form_submit_button(label='Generate Questions')
 
-if st.session_state.get("vector_stores") and st.button("Generate Reference Texts"):
-    reference_texts = generate_reference_texts()
-    st.write("Generated Reference Texts:", reference_texts)
+        if generate_questions_button:
+            question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+            questions = generate_questions_endpoint(question_request)
+            st.write("Generated Questions:", questions)
+            next_stage_button = st.button("Next")
+            if next_stage_button:
+                next_stage()
 
-st.write("---")
-
-with st.form(key='questions_form'):
-    question_type = st.selectbox("Select question type:", ["MCQ", "True/False"])
-    questions_number = st.number_input("Enter number of questions:", min_value=1, max_value=10)
-    generate_questions_button = st.form_submit_button(label='Generate Questions')
-
-    if generate_questions_button:
-        question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-        questions = generate_questions_endpoint(question_request)
-        st.write("Generated Questions:", questions)
-
-if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
-    video_segment_urls = generate_video_segment_url()
-    st.write("Generated Video Segment URLs:", video_segment_urls)
+# Stage 5: Generate Video Segment URLs
+if st.session_state.stage == 5:
+    st.header("Stage 5: Generate Video Segment URLs")
+    if st.button("Generate Video Segment URLs"):
+        video_segment_urls = generate_video_segment_url()
+        st.write("Generated Video Segment URLs:", video_segment_urls)

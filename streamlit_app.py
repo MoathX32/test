@@ -39,6 +39,7 @@ if "document_store" not in st.session_state:
 
 def next_stage():
     st.session_state.stage += 1
+    st.experimental_rerun()  # Trigger a rerun of the Streamlit script to update the stage
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -296,7 +297,7 @@ def find_video_segment(filenames, response_text, playlist_id):
 
     for filename in filenames:
         for video in videos:
-            if filename.lower() in video['title'].lower():
+            if filename.lower() in video['title'].lower()):
                 video_id = video['video_id']
                 relevant_video_urls[filename] = f"https://www.youtube.com/watch?v={video_id}"
                 break
@@ -483,7 +484,6 @@ if st.session_state.stage == 4:
             next_stage_button = st.button("Next")
             if next_stage_button:
                 next_stage()
-
 # Stage 5: Generate Video Segment URLs
 if st.session_state.stage == 5:
     st.header("Stage 5: Generate Video Segment URLs")

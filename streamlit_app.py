@@ -22,13 +22,17 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
-# Initialize session state if not already done
+# Initialize session state if not already present
 if "vector_stores" not in st.session_state:
     st.session_state.vector_stores = {}
 if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
+if "navigation_visible" not in st.session_state:
+    st.session_state.navigation_visible = False  # Initially hide navigation buttons
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "Process PDFs and Videos"  # Default page
 
 # Constants
 FOLDER_PATH = "Data"  # Fixed folder path
@@ -72,7 +76,6 @@ def get_vector_store(documents):
     vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
     return vectorstore
 
-# Function to generate responses
 # Function to generate responses with both study assistance and general chat capabilities
 def get_response(context, question, model):
     # Initialize chat history if not already present
@@ -126,21 +129,42 @@ def get_response(context, question, model):
     except Exception as e:
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
 
-
-
+# Function to extract reference texts as JSON
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""
     بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية، والتي يجب أن تتضمن عناوين دروس مثل "درس: قواعد اللغة العربية" أو "درس: أدب العصر العباسي".
     قدم العنوان الرئيسي للدرس كمفتاح 'filename'، وأضف النص الأكثر ارتباطًا فقط تحت مفتاح 'relevant_texts'.
     الإجابة: {response_text}
-    السياق المرجعي: {context}
+
+    ابحث في السياق المرجعي التالي عن المعلومات التي تدعم هذه الإجابة:
+    {context}
+
+    قدم النص الأكثر ارتباطًا مع بيان مرجعه في شكل JSON كما هو موضح أعلاه.
     """
+
     chat_session = genai.GenerativeModel(
         model_name="gemini-1.5-pro-latest",
-        generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000}
+        generation_config={
+            "temperature": 0.2,
+            "top_p": 1,
+            "top_k": 1,
+            "max_output_tokens": 8000,
+        }
     ).start_chat(history=[])
+
     ref_response = chat_session.send_message(ref_prompt)
-    return clean_json_response(ref_response.text.strip())
+    ref_response_text = ref_response.text.strip()
+
+    # Attempt to clean and parse the text as JSON
+    cleaned_text = re.sub(r'```json', '', ref_response_text).strip()
+    cleaned_text = re.sub(r'```', '', cleaned_text).strip()
+
+    try:
+        reference_texts_json = json.loads(cleaned_text)
+        return reference_texts_json
+    except json.JSONDecodeError as e:
+        logging.error(f"Error parsing reference texts JSON: {str(e)}")
+        return None
 
 # Function to generate questions
 def generate_questions(relevant_text, num_questions, question_type, model):
@@ -149,7 +173,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         You are an AI assistant tasked with generating {num_questions} multiple-choice questions (MCQs) from the given context. \
         Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided and provide the correct answer as well. \
         Ensure the output is in JSON format with fields 'question', 'options', and 'correct_answer', and ensure the output language as context language.
-        
+
         Context: {relevant_text}\n
         """
     else:
@@ -157,19 +181,27 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         You are an AI assistant tasked with generating {num_questions} true/false questions from the given context. \
         For each true/false question, provide the correct answer as well. \
         Ensure the output is in JSON format with fields 'question' and 'correct_answer', and ensure the output language as context language.
-        
+
         Context: {relevant_text}\n
         """
 
-    response = model.start_chat(history=[]).send_message(prompt_template)
-    response_text = response.text.strip()
+    try:
+        response = model.start_chat(history=[]).send_message(prompt_template)
+        response_text = response.text.strip()
 
-    if response_text:
-        return clean_json_response(response_text)
-    return None
+        if response_text:
+            response_json = json.loads(response_text)
+            return response_json
+        else:
+            logging.warning("Received an empty response from the model.")
+            return None
+    except Exception as e:
+        logging.warning(f"Error: {e}")
+        return None
 
 # Function to get playlist videos (mock implementation)
 def get_playlist_videos(playlist_id):
+    # Mock implementation
     # This should be replaced with actual code that interacts with YouTube API to fetch playlist videos
     return [
         {"title": "حقوقي وواجباتي في البيت", "video_id": "abc123"},
@@ -177,25 +209,25 @@ def get_playlist_videos(playlist_id):
         {"title": "كيف نمارس مواطنتنا في المدرسة؟", "video_id": "ghi789"}
     ]
 
-# Streamlit App
+# Main App Interface
 st.title("PDF and Video Processing App")
 
-# Sidebar Buttons
-st.sidebar.title("Navigation")
-if st.sidebar.button("Process PDFs and Videos"):
-    st.session_state.current_page = "Process PDFs and Videos"
-if st.sidebar.button("Generate Response"):
-    st.session_state.current_page = "Generate Response"
-if st.sidebar.button("Generate Reference Texts"):
-    st.session_state.current_page = "Generate Reference Texts"
-if st.sidebar.button("Generate Video Segment URLs"):
-    st.session_state.current_page = "Generate Video Segment URLs"
-if st.sidebar.button("Generate Questions"):
-    st.session_state.current_page = "Generate Questions"
+# Button to show/hide navigation
+if st.button("Toggle Navigation"):
+    st.session_state.navigation_visible = not st.session_state.navigation_visible
 
-# Default page
-if "current_page" not in st.session_state:
-    st.session_state.current_page = "Process PDFs and Videos"
+# Conditional Navigation Buttons
+if st.session_state.navigation_visible:
+    if st.button("Process PDFs and Videos"):
+        st.session_state.current_page = "Process PDFs and Videos"
+    if st.button("Generate Response"):
+        st.session_state.current_page = "Generate Response"
+    if st.button("Generate Reference Texts"):
+        st.session_state.current_page = "Generate Reference Texts"
+    if st.button("Generate Video Segment URLs"):
+        st.session_state.current_page = "Generate Video Segment URLs"
+    if st.button("Generate Questions"):
+        st.session_state.current_page = "Generate Questions"
 
 # Page Routing
 if st.session_state.current_page == "Process PDFs and Videos":
@@ -209,6 +241,7 @@ if st.session_state.current_page == "Process PDFs and Videos":
         st.session_state.vector_stores["playlist_id"] = playlist_id
         st.session_state.document_store.extend(documents)
         st.success("PDFs and playlist processed successfully!")
+        st.session_state.navigation_visible = True  # Show navigation after successful processing
 
 elif st.session_state.current_page == "Generate Response":
     st.header("Generate Response")

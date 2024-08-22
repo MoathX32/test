@@ -170,6 +170,42 @@ def extract_reference_texts_as_json(response_text, context):
         return None
 
 # Function to generate questions
+def generate_questions_endpoint():
+    if "last_reference_texts" not in st.session_state.reference_texts_store:
+        st.error("No reference texts found. Please process the reference texts first.")
+        return
+
+    try:
+        reference_texts = st.session_state.reference_texts_store["last_reference_texts"]["reference_texts"]
+
+        # Ensure that each entry is a dictionary and has the 'relevant_texts' key
+        relevant_texts = " ".join([ref.get("relevant_texts", "") for ref in reference_texts if isinstance(ref, dict)])
+
+        if not relevant_texts.strip():
+            st.error("No valid reference texts available for generating questions.")
+            return
+
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro-latest",
+            generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000},
+            system_instruction="You are a helpful document answering assistant."
+        )
+
+        questions_number = st.number_input("Number of questions", min_value=1, max_value=10, step=1)
+        question_type = st.selectbox("Select question type", ["MCQ", "True/False"])
+
+        questions_json = generate_questions(
+            relevant_text=relevant_texts,
+            num_questions=questions_number,
+            question_type=question_type,
+            model=model
+        )
+        st.json(questions_json)
+
+    except Exception as e:
+        st.error(f"An error occurred while generating questions: {str(e)}")
+
+# Function to generate questions
 def generate_questions(relevant_text, num_questions, question_type, model):
     if question_type == "MCQ":
         prompt_template = f"""
@@ -196,10 +232,10 @@ def generate_questions(relevant_text, num_questions, question_type, model):
             response_json = json.loads(response_text)
             return response_json
         else:
-            logging.warning("Received an empty response from the model.")
+            st.warning("Received an empty response from the model.")
             return None
     except Exception as e:
-        logging.warning(f"Error: {e}")
+        st.error(f"Error: {e}")
         return None
 
 # Function to get playlist videos (mock implementation)

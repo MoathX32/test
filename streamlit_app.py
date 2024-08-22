@@ -126,6 +126,8 @@ def get_response(context, question, model):
             return "أنا لا أستطيع الإجابة على هذا السؤال بناءً على المعلومات المتاحة في الدروس."
         else:
             return response_text
+    except KeyError as e:
+        return f"Error: Missing key {str(e)} in the provided data. Please check the input format."
     except Exception as e:
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
 

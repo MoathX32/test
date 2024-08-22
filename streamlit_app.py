@@ -190,14 +190,10 @@ def generate_questions_endpoint():
         st.write("Debug: Type of reference_texts:", type(reference_texts))
         st.write("Debug: Reference Texts Structure:", reference_texts)
 
-        # Check if reference_texts is a string (indicating it might be a JSON string)
-        if isinstance(reference_texts, str):
-            try:
-                # Attempt to parse the string as JSON
-                reference_texts = json.loads(reference_texts)
-            except json.JSONDecodeError:
-                st.error("Failed to parse reference_texts as JSON.")
-                return
+        # Check if reference_texts is a dictionary
+        if isinstance(reference_texts, dict):
+            # Try to extract the actual list from the dictionary
+            reference_texts = reference_texts.get("reference_texts", [])
 
         # Ensure reference_texts is now a list of dictionaries
         if not isinstance(reference_texts, list):
@@ -253,9 +249,7 @@ def generate_questions_endpoint():
     except Exception as e:
         st.error(f"An error occurred while generating questions: {str(e)}")
 
-# This function would be the one to call from your Streamlit app
-generate_questions_endpoint()
-
+# Function to generate questions
 def generate_questions(relevant_text, num_questions, question_type, model):
     if question_type == "MCQ":
         prompt_template = f"""

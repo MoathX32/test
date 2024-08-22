@@ -88,14 +88,14 @@ def get_response(context, question, model):
         for entry in st.session_state.chat_history:
             if "question" in entry and "response" in entry:
                 formatted_history.append({
-                    "content": entry["question"],
-                    "role": "user"
+                    "role": "user",
+                    "parts": [{"text": entry["question"]}]
                 })
                 formatted_history.append({
-                    "content": entry["response"],
-                    "role": "assistant"
+                    "role": "assistant",
+                    "parts": [{"text": entry["response"]}]
                 })
-        
+
         # Debugging output to check the formatted history
         st.write("Formatted History:", formatted_history)
 
@@ -139,6 +139,7 @@ def get_response(context, question, model):
     except Exception as e:
         st.error(f"Exception occurred: {str(e)}")
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
+
 
 
 # Function to extract reference texts as JSON

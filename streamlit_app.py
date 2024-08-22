@@ -232,7 +232,6 @@ def generate_questions_endpoint():
         questions_json = generate_questions(import json
 
 # Other imports if needed
-
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         st.error("No reference texts found. Please process the reference texts first.")

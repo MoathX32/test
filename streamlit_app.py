@@ -452,7 +452,10 @@ st.write("---")
 
 
 if st.button('ابدأ تشغيل المساعد'):
-    process_lessons_and_video()
+    with st.spinner('جاري معالجة الملفات...'):
+        # هنا يمكنك استدعاء الدالة process_lessons_and_video() لمعالجة الملفات
+        st.write("جاري معالجة الملفات...")  # يمكنك استبدال هذا بالنص الفعلي بعد اكتمال المعالجة
+        process_lessons_and_video()
 
 st.write("---")
 

@@ -1,4 +1,5 @@
 streamlit
+fastapi 
 PyPDF2
 python-dotenv
 langchain

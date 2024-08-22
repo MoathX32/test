@@ -329,6 +329,11 @@ class QuestionRequest(BaseModel):
     questions_number: int
 
 def generate_questions(relevant_text, num_questions, question_type, model):
+    if not relevant_text.strip():
+        logging.warning("Relevant text is empty or invalid.")
+        st.error("Relevant text is empty or invalid.")
+        return None
+
     if question_type == "MCQ":
         prompt_template = f"""
         You are an AI assistant tasked with generating {num_questions} multiple-choice questions (MCQs) from the given context. \
@@ -350,7 +355,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
-        logging.info(f"Model Response: {response_text}")  # Logging model response
+        logging.info(f"Model Response: {response_text}")  # Log the model's response
 
         if response_text:
             response_json = clean_json_response(response_text)
@@ -358,13 +363,17 @@ def generate_questions(relevant_text, num_questions, question_type, model):
                 return response_json
             else:
                 logging.warning("Failed to decode JSON from model response.")
+                st.error("Failed to decode JSON from the model's response.")
                 return None
         else:
             logging.warning("Received an empty response from the model.")
+            st.error("Received an empty response from the model.")
             return None
     except Exception as e:
         logging.warning(f"Error: {e}")
+        st.error(f"Error generating questions: {e}")
         return None
+
 
 def generate_questions_endpoint(question_request: QuestionRequest):
     if "last_reference_texts" not in st.session_state.reference_texts_store:

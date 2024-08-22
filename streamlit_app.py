@@ -455,8 +455,7 @@ if st.button('ابدأ تشغيل المساعد'):
     with st.spinner('جاري معالجة الملفات...'):
         # استدعاء الدالة process_lessons_and_video() لمعالجة الملفات
         process_lessons_and_video()
-    st.success("PDFs and playlist processed successfully")
-
+        
 st.write("---")
 
 with st.form(key='response_form'):

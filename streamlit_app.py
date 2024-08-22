@@ -169,11 +169,7 @@ def extract_reference_texts_as_json(response_text, context):
         logging.error(f"Error parsing reference texts JSON: {str(e)}")
         return None
 
-# Function to generate questions
-# Function to generate questions with improved error handling
-import json
 
-import json
 
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:

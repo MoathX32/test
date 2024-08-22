@@ -92,7 +92,7 @@ def get_response(context, question, model):
                     "parts": [{"text": entry["question"]}]
                 })
                 formatted_history.append({
-                    "role": "assistant",
+                    "role": "model",  # Changed from "assistant" to "model"
                     "parts": [{"text": entry["response"]}]
                 })
 
@@ -128,6 +128,7 @@ def get_response(context, question, model):
     except Exception as e:
         st.error(f"Exception occurred: {str(e)}")
         return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
+
 
 
 

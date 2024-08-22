@@ -422,9 +422,12 @@ def get_playlist_videos(playlist_id):
 # Streamlit UI Components
 import streamlit as st
 
-# تحقق من وجود حالة "processing_complete" في session_state
+# التحقق من وجود الحالات في session_state
 if "processing_complete" not in st.session_state:
     st.session_state.processing_complete = False
+
+if "response_submitted" not in st.session_state:
+    st.session_state.response_submitted = False
 
 # عنوان الصفحة
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
@@ -463,9 +466,8 @@ if st.button('ابدأ تشغيل المساعد'):
 
 st.write("---")
 
-# إظهار النماذج فقط إذا تمت معالجة الملفات
+# إظهار النموذج response_form فقط إذا تمت معالجة الملفات
 if st.session_state.processing_complete:
-    # نموذج لإدخال السؤال والحصول على الرد
     with st.form(key='response_form'):
         query = st.text_input("كيف يمكنني مساعدتك:")
         response_button = st.form_submit_button(label='أجب')
@@ -474,9 +476,12 @@ if st.session_state.processing_complete:
             query_request = QueryRequest(query=query)
             response = generate_response(query_request)
             st.write("الرد:", response)
+            st.session_state.response_submitted = True  # تحديث حالة تقديم الرد
 
-    st.write("---")
+st.write("---")
 
+# إظهار العناصر التالية فقط بعد تقديم الرد
+if st.session_state.response_submitted:
     # زر لعرض النصوص المرجعية
     if st.session_state.get("vector_stores") and st.button("المصادر"):
         reference_texts = generate_reference_texts()
@@ -499,3 +504,4 @@ if st.session_state.processing_complete:
     if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
         video_segment_urls = generate_video_segment_url()
         st.write("Generated Video Segment URLs:", video_segment_urls)
+

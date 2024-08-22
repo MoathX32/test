@@ -75,6 +75,7 @@ def get_vector_store(documents):
 # Function to generate responses
 # Function to generate responses with both study assistance and general chat capabilities
 # Function to generate responses with both study assistance and general chat capabilities
+# Function to generate responses with both study assistance and general chat capabilities
 def get_response(context, question, model):
     # Initialize chat history if not already present
     if "chat_history" not in st.session_state:
@@ -83,14 +84,15 @@ def get_response(context, question, model):
     # Ensure chat history entries are correctly formatted
     formatted_history = []
     for entry in st.session_state.chat_history:
-        formatted_history.append({
-            "author": "user",
-            "content": entry["question"]
-        })
-        formatted_history.append({
-            "author": "bot",
-            "content": entry["response"]
-        })
+        if "question" in entry and "response" in entry:
+            formatted_history.append({
+                "author": "user",
+                "content": entry["question"]
+            })
+            formatted_history.append({
+                "author": "bot",
+                "content": entry["response"]
+            })
 
     # Check if the question is related to the study content or a general chat
     is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
@@ -117,7 +119,7 @@ def get_response(context, question, model):
         response_text = response.text.strip()
 
         # Save the current conversation in the chat history
-        st.session_state.chat_history.append({"context": context, "question": question, "response": response_text})
+        st.session_state.chat_history.append({"question": question, "response": response_text})
 
         if is_study_related and ("لا أستطيع الإجابة" in response_text or not response_text):
             return "أنا لا أستطيع الإجابة على هذا السؤال بناءً على المعلومات المتاحة في الدروس."

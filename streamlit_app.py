@@ -418,7 +418,7 @@ def get_playlist_videos(playlist_id):
     ]
 
 # Streamlit UI Components
-st.title("مرحبا بك ! n\أنا مساعد مادة اللغة العربية للصف الرابع")
+st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
 if st.button('ابدأ تشغيل المساعد'):
     process_lessons_and_video()

@@ -171,25 +171,40 @@ def extract_reference_texts_as_json(response_text, context):
 
 # Function to generate questions
 # Function to generate questions with improved error handling
+import json
+
 def generate_questions_endpoint():
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         st.error("No reference texts found. Please process the reference texts first.")
         return
 
     try:
-        # Retrieve the reference texts
+        # Retrieve the reference texts safely
         last_reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
         reference_texts = last_reference_texts.get("reference_texts", [])
 
         # Debugging: Output the structure of reference_texts
-        st.write("Reference Texts:", reference_texts)
+        st.write("Debug: Reference Texts:", reference_texts)
 
-        # Ensure that reference_texts is a list and contains dictionaries with 'relevant_texts' keys
-        if not isinstance(reference_texts, list):
-            st.error("Invalid format for reference texts. Expected a list.")
-            return
+        relevant_texts_list = []
+        for ref in reference_texts:
+            if isinstance(ref, str):
+                try:
+                    ref_dict = json.loads(ref)  # Parse the JSON string
+                except json.JSONDecodeError as e:
+                    st.error(f"Failed to parse JSON: {str(e)}")
+                    continue
 
-        relevant_texts = " ".join([ref.get("relevant_texts", "") for ref in reference_texts if isinstance(ref, dict)])
+                if isinstance(ref_dict, dict) and "relevant_texts" in ref_dict:
+                    relevant_texts_list.append(ref_dict["relevant_texts"])
+                else:
+                    st.warning(f"Skipping invalid reference text entry: {ref_dict}")
+            elif isinstance(ref, dict) and "relevant_texts" in ref:
+                relevant_texts_list.append(ref["relevant_texts"])
+            else:
+                st.warning(f"Skipping invalid reference text entry: {ref}")
+
+        relevant_texts = " ".join(relevant_texts_list)
 
         if not relevant_texts.strip():
             st.error("No valid reference texts available for generating questions.")
@@ -247,6 +262,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
     except Exception as e:
         st.error(f"Error: {e}")
         return None
+
 
 # Function to get playlist videos (mock implementation)
 def get_playlist_videos(playlist_id):

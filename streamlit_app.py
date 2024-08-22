@@ -454,43 +454,45 @@ st.write("---")
 # هنا تكمل بقية الكود الخاص بك
 
 
+# زر لتشغيل المساعد
 if st.button('ابدأ تشغيل المساعد'):
     with st.spinner('جاري معالجة الملفات...'):
         # استدعاء الدالة process_lessons_and_video() لمعالجة الملفات
         process_lessons_and_video()
     st.session_state.processing_complete = True  # تحديث حالة المعالجة
 
-        
 st.write("---")
 
-with st.form(key='response_form'):
-    query = st.text_input("كيف يمكنني مساعدتك :")
-    response_button = st.form_submit_button(label='أجب')
+# إظهار النماذج فقط إذا تمت معالجة الملفات
+if st.session_state.processing_complete:
 
-    if response_button:
-        query_request = QueryRequest(query=query)
-        response = generate_response(query_request)
-        st.write("الرد:", response)
+    with st.form(key='response_form'):
+        query = st.text_input("كيف يمكنني مساعدتك:")
+        response_button = st.form_submit_button(label='أجب')
 
-st.write("---")
+        if response_button:
+            query_request = QueryRequest(query=query)
+            response = generate_response(query_request)
+            st.write("الرد:", response)
 
-if st.session_state.get("vector_stores") and st.button("المصادر"):
-    reference_texts = generate_reference_texts()
-    st.write("النصوص من الكتاب:", reference_texts)
+    st.write("---")
 
-st.write("---")
+    if st.session_state.get("vector_stores") and st.button("المصادر"):
+        reference_texts = generate_reference_texts()
+        st.write("النصوص من الكتاب:", reference_texts)
 
-with st.form(key='questions_form'):
-    question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-    questions_number = st.number_input("اختر عدد الاسئلة:", min_value=1, max_value=10)
-    generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+    st.write("---")
 
-    if generate_questions_button:
-        question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-        questions = generate_questions_endpoint(question_request)
-        st.write("الأختبار:", questions)
+    with st.form(key='questions_form'):
+        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+        questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=10)
+        generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
-if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
-    video_segment_urls = generate_video_segment_url()
-    st.write("Generated Video Segment URLs:", video_segment_urls)
+        if generate_questions_button:
+            question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+            questions = generate_questions_endpoint(question_request)
+            st.write("الاختبار:", questions)
 
+    if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
+        video_segment_urls = generate_video_segment_url()
+        st.write("Generated Video Segment URLs:", video_segment_urls)

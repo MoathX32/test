@@ -84,12 +84,12 @@ def get_response(context, question, model):
     for entry in st.session_state.chat_history:
         if "question" in entry and "response" in entry:
             formatted_history.append({
-                "text": entry["question"],
-                "author": "user"
+                "content": entry["question"],
+                "role": "user"
             })
             formatted_history.append({
-                "text": entry["response"],
-                "author": "bot"
+                "content": entry["response"],
+                "role": "assistant"
             })
 
     # Check if the question is related to the study content or a general chat
@@ -124,7 +124,8 @@ def get_response(context, question, model):
         else:
             return response_text
     except Exception as e:
-        return "حدث خطأ أثناء محاولة الإجابة على سؤالك. من فضلك حاول مرة أخرى لاحقًا."
+        return f"حدث خطأ أثناء محاولة الإجابة على سؤالك: {str(e)}. من فضلك حاول مرة أخرى لاحقًا."
+
 
 
 def extract_reference_texts_as_json(response_text, context):

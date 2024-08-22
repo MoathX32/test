@@ -419,103 +419,72 @@ def get_playlist_videos(playlist_id):
 
 
 
-st.markdown(
-    """
-    <style>
-    /* محاذاة كل النصوص لليمين */
-    .css-1d391kg p, .css-1d391kg h1, .css-1d391kg h2, .css-1d391kg h3, .css-1d391kg h4, .css-1d391kg h5, .css-1d391kg h6 {
-        text-align: right;
-    }
-
-    /* محاذاة حقول الإدخال لليمين */
-    .stTextInput > div > div > input {
-        direction: rtl;
-        text-align: right;
-    }
-
-    /* محاذاة القوائم المنسدلة لليمين */
-    .stSelectbox > div > div > div > select {
-        direction: rtl;
-        text-align: right;
-    }
-
-    /* محاذاة الأزرار لليمين */
-    .stButton > button {
-        float: right;
-    }
-    
-    /* محاذاة مربعات التوسع لليمين */
-    .streamlit-expanderHeader {
-        text-align: right;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# عنوان الصفحة
+# Streamlit UI Components
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
-# شريط جانبي للإرشادات
-with st.sidebar.expander("ارشادات الاستخدام"):
-    st.write("""
-    **تنبيه:**
-    البرنامج مازال تحت التجريب وقد يحتوي على بعض الأخطاء أو الميزات غير المكتملة. نقدر تفهمك وأي ملاحظات قد تساعد في تحسين الأداء.
+import streamlit as st
 
-    **إرشادات المستخدم لواجهة Streamlit:**
-    1. **تشغيل المساعد:**
-       عند فتح واجهة Streamlit، ستجد زرًا بعنوان "ابدأ تشغيل المساعد". بالضغط على هذا الزر، يبدأ البرنامج في معالجة ملفات PDF الموجودة في مجلد Data وتحليل محتوى الفيديوهات من قائمة تشغيل YouTube المحددة.
-    2. **طرح سؤال:**
-       في الجزء المخصص للأسئلة، يمكنك إدخال سؤالك في حقل النص "كيف يمكنني مساعدتك". بعد إدخال السؤال، اضغط على زر "أجب". سيقوم البرنامج بمعالجة سؤالك بناءً على النصوص المستخرجة من ملفات PDF ويعرض الرد في الأسفل.
-    3. **عرض المصادر:**
-       بعد الحصول على الرد على سؤالك، يمكنك الضغط على زر "المصادر" لعرض النصوص المرجعية من ملفات PDF التي تم استخدامها لتكوين الإجابة.
-    4. **إنشاء أسئلة اختبار:**
-       في قسم إنشاء الأسئلة، اختر نوع السؤال الذي ترغب في إنشائه (اختيارات متعددة "MCQ" أو صح/خطأ "True/False").
-       حدد عدد الأسئلة باستخدام المؤشر، ثم اضغط على "ابدأ وضع الاختبار". سيتم عرض الأسئلة المتولدة بناءً على النصوص المرجعية.
-    5. **إنشاء روابط مقاطع الفيديو:**
-       إذا كنت قد قمت بمعالجة النصوص المرجعية وتحتاج إلى العثور على المقاطع المتعلقة بهذه النصوص في قائمة تشغيل YouTube، يمكنك الضغط على زر "Generate Video Segment URLs". سيقوم البرنامج بتوليد الروابط للمقاطع ذات الصلة ويعرضها لك.
-    6. **تنبيهات وأخطاء:**
-       إذا واجهتك أي أخطاء، ستظهر رسائل خطأ في الواجهة تشرح المشكلة، مثل عدم العثور على ملفات PDF، أو عدم القدرة على توليد الردود أو الأسئلة.
-    """)
+# زر لإظهار الإرشادات
+if st.button('إرشادات الاستخدام'):
+    with st.expander("إرشادات الاستخدام"):
+        st.write("""
+        **تنبيه:**
+        البرنامج مازال تحت التجريب وقد يحتوي على بعض الأخطاء أو الميزات غير المكتملة. نقدر تفهمك وأي ملاحظات قد تساعد في تحسين الأداء.
 
-
-# زر لتشغيل المساعد
-if st.button('ابدأ تشغيل المساعد'):
-    # هنا يمكنك استدعاء الدالة process_lessons_and_video() لمعالجة الملفات
-    st.write("جاري معالجة الملفات...")
+        **إرشادات المستخدم لواجهة Streamlit:**
+        1. **تشغيل المساعد:**
+           عند فتح واجهة Streamlit، ستجد زرًا بعنوان "ابدأ تشغيل المساعد". بالضغط على هذا الزر، يبدأ البرنامج في معالجة ملفات PDF الموجودة في مجلد Data وتحليل محتوى الفيديوهات من قائمة تشغيل YouTube المحددة.
+        2. **طرح سؤال:**
+           في الجزء المخصص للأسئلة، يمكنك إدخال سؤالك في حقل النص "كيف يمكنني مساعدتك". بعد إدخال السؤال، اضغط على زر "أجب". سيقوم البرنامج بمعالجة سؤالك بناءً على النصوص المستخرجة من ملفات PDF ويعرض الرد في الأسفل.
+        3. **عرض المصادر:**
+           بعد الحصول على الرد على سؤالك، يمكنك الضغط على زر "المصادر" لعرض النصوص المرجعية من ملفات PDF التي تم استخدامها لتكوين الإجابة.
+        4. **إنشاء أسئلة اختبار:**
+           في قسم إنشاء الأسئلة، اختر نوع السؤال الذي ترغب في إنشائه (اختيارات متعددة "MCQ" أو صح/خطأ "True/False").
+           حدد عدد الأسئلة باستخدام المؤشر، ثم اضغط على "ابدأ وضع الاختبار". سيتم عرض الأسئلة المتولدة بناءً على النصوص المرجعية.
+        5. **إنشاء روابط مقاطع الفيديو:**
+           إذا كنت قد قمت بمعالجة النصوص المرجعية وتحتاج إلى العثور على المقاطع المتعلقة بهذه النصوص في قائمة تشغيل YouTube، يمكنك الضغط على زر "Generate Video Segment URLs". سيقوم البرنامج بتوليد الروابط للمقاطع ذات الصلة ويعرضها لك.
+        6. **تنبيهات وأخطاء:**
+           إذا واجهتك أي أخطاء، ستظهر رسائل خطأ في الواجهة تشرح المشكلة، مثل عدم العثور على ملفات PDF، أو عدم القدرة على توليد الردود أو الأسئلة.
+        """)
 
 st.write("---")
 
-# نموذج لإدخال السؤال والحصول على الرد
+# هنا تكمل بقية الكود الخاص بك
+
+
+if st.button('ابدأ تشغيل المساعد'):
+    process_lessons_and_video()
+
+st.write("---")
+
 with st.form(key='response_form'):
-    query = st.text_input("كيف يمكنني مساعدتك:")
+    query = st.text_input("كيف يمكنني مساعدتك :")
     response_button = st.form_submit_button(label='أجب')
 
     if response_button:
-        # هنا يمكنك استدعاء الدالة generate_response() للحصول على الرد
-        st.write("الرد: هنا سيتم عرض الرد")
+        query_request = QueryRequest(query=query)
+        response = generate_response(query_request)
+        st.write("الرد:", response)
 
 st.write("---")
 
-# زر لعرض النصوص المرجعية
 if st.session_state.get("vector_stores") and st.button("المصادر"):
-    # هنا يمكنك استدعاء الدالة generate_reference_texts() لعرض النصوص المرجعية
-    st.write("النصوص من الكتاب: هنا سيتم عرض النصوص المرجعية")
+    reference_texts = generate_reference_texts()
+    st.write("النصوص من الكتاب:", reference_texts)
 
 st.write("---")
 
-# نموذج لإنشاء الأسئلة
 with st.form(key='questions_form'):
     question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-    questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=10)
+    questions_number = st.number_input("اختر عدد الاسئلة:", min_value=1, max_value=10)
     generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
     if generate_questions_button:
-        # هنا يمكنك استدعاء الدالة generate_questions_endpoint() لإنشاء الأسئلة
-        st.write("الاختبار: هنا سيتم عرض الأسئلة المتولدة")
+        question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+        questions = generate_questions_endpoint(question_request)
+        st.write("الأختبار:", questions)
 
-# زر لتوليد روابط مقاطع الفيديو
 if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
-    # هنا يمكنك استدعاء الدالة generate_video_segment_url() لتوليد الروابط
-    st.write("Generated Video Segment URLs: هنا سيتم عرض روابط مقاطع الفيديو")
+    video_segment_urls = generate_video_segment_url()
+    st.write("Generated Video Segment URLs:", video_segment_urls)
+

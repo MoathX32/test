@@ -420,6 +420,9 @@ def get_playlist_videos(playlist_id):
 
 
 # Streamlit UI Components
+if "processing_complete" not in st.session_state:
+    st.session_state.processing_complete = False
+
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
 import streamlit as st
@@ -455,6 +458,8 @@ if st.button('ابدأ تشغيل المساعد'):
     with st.spinner('جاري معالجة الملفات...'):
         # استدعاء الدالة process_lessons_and_video() لمعالجة الملفات
         process_lessons_and_video()
+    st.session_state.processing_complete = True  # تحديث حالة المعالجة
+
         
 st.write("---")
 

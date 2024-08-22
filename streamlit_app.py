@@ -99,34 +99,23 @@ def get_response(context, question, model):
         # Debugging output to check the formatted history
         st.write("Formatted History:", formatted_history)
 
-        # Check if the question is related to the study content or a general chat
-        is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
-
-        if is_study_related:
-            # Study-related response using the provided context
-            prompt_template = """
+        # Always treat the question as study-related, use the provided context
+        prompt_template = """
             أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. مهمتك هي مساعدة الطلاب على فهم الدروس والإجابة على أسئلتهم باستخدام المعلومات الموجودة في الدروس فقط.
             استخدم النص الموجود في السياق المرجعي أدناه للإجابة على السؤال. إذا لم تتمكن من العثور على إجابة في النص، أخبر المستخدم أنك غير قادر على الإجابة بناءً على المعلومات المتاحة.
             لا تقدم معلومات خارج هذا السياق والموضوعات.
             السياق: {context}\n
             السؤال: {question}\n
             """
-            chat_session = model.start_chat(history=formatted_history)
-        else:
-            # General chat response
-            prompt_template = """
-            أنت مساعد دردشة ذكي. يمكنك الدردشة مع الطالب وبدء محادثة ودية.
-            السؤال: {question}\n
-            """
-            chat_session = model.start_chat(history=formatted_history)
+        chat_session = model.start_chat(history=formatted_history)
 
-        response = chat_session.send_message(prompt_template.format(context=context if is_study_related else "", question=question))
+        response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text.strip()
 
         # Save the current conversation in the chat history
         st.session_state.chat_history.append({"question": question, "response": response_text})
 
-        if is_study_related and ("لا أستطيع الإجابة" in response_text or not response_text):
+        if "لا أستطيع الإجابة" in response_text or not response_text:
             return "أنا لا أستطيع الإجابة على هذا السؤال بناءً على المعلومات المتاحة في الدروس."
         else:
             return response_text

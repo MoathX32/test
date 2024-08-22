@@ -73,28 +73,46 @@ def get_vector_store(documents):
     return vectorstore
 
 # Function to generate responses
+# Function to generate responses with both study assistance and general chat capabilities
 def get_response(context, question, model):
-    chat_session = model.start_chat(history=[])
-    prompt_template = """
-    أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
-    أجب على السؤال التالي باستخدام النص الموجود في السياق المرجعي أدناه فقط. قدم إجابة بسيطة وواضحة تتناسب مع مستوى الصفوف الأولى.
-    يجب أن يكون الرد مختصرًا ومفهومًا.
-    لا تجب على أي سؤال خارج سياق النص.
-    السياق: {context}\n
-    السؤال: {question}\n
-    """
-    response = chat_session.send_message(prompt_template.format(context=context, question=question))
-    return response.text
+    # Initialize chat history if not already present
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-# Function to extract reference texts as JSON
-def clean_json_response(response_text):
-    cleaned_text = re.sub(r'```json', '', response_text).strip()
-    cleaned_text = re.sub(r'```', '', cleaned_text).strip()
-    match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
-    if match:
-        cleaned_text = match.group(0)
-        return json.loads(cleaned_text)
-    return None
+    # Check if the question is related to the study content or a general chat
+    is_study_related = any(keyword in question.lower() for keyword in ["درس", "قواعد", "سؤال", "معلومة", "شرح", "كتاب", "نص"])
+
+    if is_study_related:
+        # Study-related response using the provided context
+        chat_session = model.start_chat(history=st.session_state.chat_history)
+        prompt_template = """
+        أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. مهمتك هي مساعدة الطلاب على فهم الدروس والإجابة على أسئلتهم باستخدام المعلومات الموجودة في الدروس فقط.
+        استخدم النص الموجود في السياق المرجعي أدناه للإجابة على السؤال. إذا لم تتمكن من العثور على إجابة في النص، أخبر المستخدم أنك غير قادر على الإجابة بناءً على المعلومات المتاحة.
+        السياق: {context}\n
+        السؤال: {question}\n
+        """
+    else:
+        # General chat response
+        chat_session = model.start_chat(history=st.session_state.chat_history)
+        prompt_template = """
+        أنت مساعد دردشة ذكي. يمكنك الدردشة مع الطالب والإجابة على أي أسئلة عامة أو بدء محادثة ودية.
+        السؤال: {question}\n
+        """
+
+    try:
+        response = chat_session.send_message(prompt_template.format(context=context if is_study_related else "", question=question))
+        response_text = response.text.strip()
+
+        # Save the current conversation in the chat history
+        st.session_state.chat_history.append({"context": context, "question": question, "response": response_text})
+
+        if is_study_related and ("لا أستطيع الإجابة" in response_text or not response_text):
+            return "أنا لا أستطيع الإجابة على هذا السؤال بناءً على المعلومات المتاحة في الدروس."
+        else:
+            return response_text
+    except Exception as e:
+        return "حدث خطأ أثناء محاولة الإجابة على سؤالك. من فضلك حاول مرة أخرى لاحقًا."
+
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""

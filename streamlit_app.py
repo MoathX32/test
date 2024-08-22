@@ -418,39 +418,39 @@ def get_playlist_videos(playlist_id):
     ]
 
 # Streamlit UI Components
-st.title("Educational Content Processing and Question Generation App")
+st.title("مرحبا بك في مساعد مادة اللغة العربية للصف الرابع")
 
-if st.button('Process Lessons and Videos'):
+if st.button('ابدأ تشغيل المساعد'):
     process_lessons_and_video()
 
 st.write("---")
 
 with st.form(key='response_form'):
-    query = st.text_input("Enter your query:")
-    response_button = st.form_submit_button(label='Generate Response')
+    query = st.text_input("كيف يمكنني مساعدتك :")
+    response_button = st.form_submit_button(label='أجب')
 
     if response_button:
         query_request = QueryRequest(query=query)
         response = generate_response(query_request)
-        st.write("Generated Response:", response)
+        st.write("الرد:", response)
 
 st.write("---")
 
-if st.session_state.get("vector_stores") and st.button("Generate Reference Texts"):
+if st.session_state.get("vector_stores") and st.button("المصادر"):
     reference_texts = generate_reference_texts()
-    st.write("Generated Reference Texts:", reference_texts)
+    st.write("النصوص من الكتاب:", reference_texts)
 
 st.write("---")
 
 with st.form(key='questions_form'):
-    question_type = st.selectbox("Select question type:", ["MCQ", "True/False"])
-    questions_number = st.number_input("Enter number of questions:", min_value=1, max_value=10)
-    generate_questions_button = st.form_submit_button(label='Generate Questions')
+    question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+    questions_number = st.number_input("اختر عدد الاسئلة:", min_value=1, max_value=10)
+    generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
     if generate_questions_button:
         question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
         questions = generate_questions_endpoint(question_request)
-        st.write("Generated Questions:", questions)
+        st.write("الأختبار:", questions)
 
 if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
     video_segment_urls = generate_video_segment_url()

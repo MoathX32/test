@@ -32,6 +32,8 @@ if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []  # Initialize chat history
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -103,7 +105,8 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_response(context, question, model):
-    chat_session = model.start_chat(history=[])
+    # استخدام التاريخ من session_state
+    chat_session = model.start_chat(history=st.session_state.chat_history)
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
@@ -115,10 +118,12 @@ def get_response(context, question, model):
     السؤال: {question}\n
     """
 
-
     try:
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
+
+        # تحديث تاريخ الدردشة
+        st.session_state.chat_history.append({"user": question, "bot": response_text})
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
             for rating in response.safety_ratings:
@@ -161,7 +166,6 @@ def generate_response(query_request: QueryRequest):
     response = get_response(context, query_request.query, model)
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
-
 
 def clean_json_response(response_text):
     try:
@@ -225,6 +229,7 @@ def extract_reference_texts_as_json(response_text, context):
 def generate_reference_texts():
     if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
         raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
+
     
     response_text = st.session_state.vector_stores['response_text']
     
@@ -418,8 +423,6 @@ def get_playlist_videos(playlist_id):
         {"title": "كيف نمارس مواطنتنا في المدرسة؟", "video_id": "ghi789"}
     ]
 
-
-
 # Streamlit UI Components
 import streamlit as st
 
@@ -473,6 +476,7 @@ if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
     st.session_state.document_store = []
     st.session_state.response_submitted = False
     st.session_state.sources_shown = False
+    st.session_state.chat_history = []  # مسح سجل الدردشة
 
     with st.spinner('جاري معالجة الملفات...'):
        process_lessons_and_video()  # استدعاء الدالة لمعالجة الملفات
@@ -522,5 +526,3 @@ if st.session_state.processing_complete:
             if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
                 video_segment_urls = generate_video_segment_url()
                 st.write("Generated Video Segment URLs:", video_segment_urls)
-
-

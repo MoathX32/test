@@ -155,7 +155,7 @@ def get_response(context, question, model):
         return ""
 
 def generate_response(query_request: QueryRequest):
-    if "pdf_vectorstore" not in st.session_state:
+    if "pdf_vectorstore" not in st.session_state.vector_stores:
         st.error("PDFs must be processed first before generating a response.")
         return
 
@@ -310,7 +310,7 @@ def find_video_segment(filenames, response_text, playlist_id):
 
     for filename in filenames:
         for video in videos:
-            if filename.lower() in video['title'].lower():
+            if filename.lower() in video['title'].lower()):
                 video_id = video['video_id']
                 relevant_video_urls[filename] = f"https://www.youtube.com/watch?v={video_id}"
                 break

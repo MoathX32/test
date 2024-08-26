@@ -194,7 +194,7 @@ def clean_json_response(response_text):
             cleaned_text = re.sub(r'```', '', cleaned_text).strip()
 
             match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
-            if match):
+            if match:
                 cleaned_text = match.group(0)
                 response_json = json.loads(cleaned_text)
                 return response_json
@@ -204,6 +204,7 @@ def clean_json_response(response_text):
         except (ValueError, json.JSONDecodeError) as e:
             logging.error(f"Response is not a valid JSON: {str(e)}")
             return None
+
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""

@@ -104,8 +104,24 @@ def process_lessons_and_video():
 class QueryRequest(BaseModel):
     query: str
 
+def format_chat_history(chat_history):
+    # Convert the chat history to the format expected by the Google Generative AI model
+    formatted_history = []
+    for entry in chat_history:
+        formatted_history.append({
+            "role": entry["role"],
+            "content": {
+                "text": entry["content"]
+            }
+        })
+    return formatted_history
+
 def get_response(context, question, model):
-    chat_session = model.start_chat(history=st.session_state.chat_history)
+    # Format the chat history
+    formatted_history = format_chat_history(st.session_state.chat_history)
+    
+    # Start the chat with the formatted history
+    chat_session = model.start_chat(history=formatted_history)
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
@@ -139,7 +155,7 @@ def get_response(context, question, model):
         return ""
 
 def generate_response(query_request: QueryRequest):
-    if "pdf_vectorstore" not in st.session_state.vector_stores:
+    if "pdf_vectorstore" not in st.session_state:
         st.error("PDFs must be processed first before generating a response.")
         return
 
@@ -218,7 +234,7 @@ def extract_reference_texts_as_json(response_text, context):
             "top_k": 1,
             "max_output_tokens": 8000,
         }
-    ).start_chat(history=st.session_state.chat_history)
+    ).start_chat(history=format_chat_history(st.session_state.chat_history))
     
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
@@ -360,7 +376,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
 
     try:
-        response = model.start_chat(history=st.session_state.chat_history).send_message(prompt_template)
+        response = model.start_chat(history=format_chat_history(st.session_state.chat_history)).send_message(prompt_template)
         response_text = response.text.strip()
 
         logging.info(f"Model Response: {response_text}")  # Log the model's response

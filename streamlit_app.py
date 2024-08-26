@@ -331,6 +331,7 @@ class QuestionRequest(BaseModel):
     question_type: str
     questions_number: int
 
+
 def generate_questions(relevant_text, num_questions, question_type, model):
     if not relevant_text.strip():
         logging.warning("Relevant text is empty or invalid.")
@@ -339,8 +340,9 @@ def generate_questions(relevant_text, num_questions, question_type, model):
 
     if question_type == "MCQ":
         prompt_template = f"""
-        You are an AI assistant tasked with generating {num_questions} multiple-choice questions (MCQs) from the given context. \
-        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided, but also feel free to generate questions based on the broader context even if not directly mentioned in the text. \
+        You are an AI assistant tasked with generating exactly {num_questions} multiple-choice questions (MCQs) from the given context. 
+        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided, but also feel free to generate questions based on the broader context even if not directly mentioned in the text.
+        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
         Ensure the output includes diverse examples that test different aspects of the context. The correct answer should be clearly indicated.
         The questions should be formatted in JSON with fields 'question', 'options', and 'correct_answer'. Ensure the output language matches the context language.
         
@@ -348,8 +350,9 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
     else:
         prompt_template = f"""
-        You are an AI assistant tasked with generating {num_questions} true/false questions from the given context. \
-        Create a variety of true/false questions that not only test the information directly presented in the text but also draw on the broader context. \
+        You are an AI assistant tasked with generating exactly {num_questions} true/false questions from the given context. 
+        Create a variety of true/false questions that not only test the information directly presented in the text but also draw on the broader context.
+        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
         Ensure the output includes different examples that challenge the understanding of the context. The correct answer should be provided for each question.
         The questions should be formatted in JSON with fields 'question' and 'correct_answer'. Ensure the output language matches the context language.
         
@@ -367,7 +370,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
             if response_json:
                 # Check if the number of generated questions matches the required number
                 if len(response_json) < num_questions:
-                    logging.warning("Generated fewer questions than requested.")
+                    logging.warning(f"Generated {len(response_json)} questions out of {num_questions} requested.")
                     st.warning(f"Only {len(response_json)} questions were generated out of the requested {num_questions}.")
                 return response_json
             else:

@@ -339,19 +339,28 @@ class QuestionRequest(BaseModel):
     questions_number: int
 
 def generate_questions(relevant_text, num_questions, question_type, model):
+    if not relevant_text.strip():
+        logging.warning("Relevant text is empty or invalid.")
+        st.error("Relevant text is empty or invalid.")
+        return None
+
     if question_type == "MCQ":
         prompt_template = f"""
-        You are an AI assistant tasked with generating {num_questions} multiple-choice questions (MCQs) from the given context. \
-        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided and provide the correct answer as well. \
-        Ensure the output is in JSON format with fields 'question', 'options', and 'correct_answer', and ensure the output language as context language.
+        You are an AI assistant tasked with generating exactly {num_questions} multiple-choice questions (MCQs) from the given context. 
+        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided, but also feel free to generate questions based on the broader context even if not directly mentioned in the text.
+        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
+        Ensure the output includes diverse examples that test different aspects of the context. The correct answer should be clearly indicated.
+        The questions should be formatted in JSON with fields 'question', 'options', and 'correct_answer'. Ensure the output language matches the context language.
         
         Context: {relevant_text}\n
         """
     else:
         prompt_template = f"""
-        You are an AI assistant tasked with generating {num_questions} true/false questions from the given context. \
-        For each true/false question, provide the correct answer as well. \
-        Ensure the output is in JSON format with fields 'question' and 'correct_answer', and ensure the output language as context language.
+        You are an AI assistant tasked with generating exactly {num_questions} true/false questions from the given context. 
+        Create a variety of true/false questions that not only test the information directly presented in the text but also draw on the broader context.
+        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
+        Ensure the output includes different examples that challenge the understanding of the context. The correct answer should be provided for each question.
+        The questions should be formatted in JSON with fields 'question' and 'correct_answer'. Ensure the output language matches the context language.
         
         Context: {relevant_text}\n
         """
@@ -360,21 +369,29 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
-        logging.info(f"Model Response: {response_text}")  # تسجيل استجابة النموذج
+        logging.info(f"Model Response: {response_text}")  # Log the model's response
 
         if response_text:
             response_json = clean_json_response(response_text)
             if response_json:
+                # Check if the number of generated questions matches the required number
+                if len(response_json) < num_questions:
+                    logging.warning(f"Generated {len(response_json)} questions out of {num_questions} requested.")
+                    st.warning(f"Only {len(response_json)} questions were generated out of the requested {num_questions}.")
                 return response_json
             else:
                 logging.warning("Failed to decode JSON from model response.")
+                st.error("Failed to decode JSON from the model's response.")
                 return None
         else:
             logging.warning("Received an empty response from the model.")
+            st.error("Received an empty response from the model.")
             return None
     except Exception as e:
         logging.warning(f"Error: {e}")
+        st.error(f"Error generating questions: {e}")
         return None
+
 
 @app.post("/generate_questions")
 async def generate_questions_endpoint(question_request: QuestionRequest):

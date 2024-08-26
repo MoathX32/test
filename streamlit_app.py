@@ -32,8 +32,6 @@ if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -104,24 +102,8 @@ def process_lessons_and_video():
 class QueryRequest(BaseModel):
     query: str
 
-def format_chat_history(chat_history):
-    # Convert the chat history to the format expected by the Google Generative AI model
-    formatted_history = []
-    for entry in chat_history:
-        formatted_history.append({
-            "role": entry["role"],
-            "content": {
-                "text": entry["content"]
-            }
-        })
-    return formatted_history
-
 def get_response(context, question, model):
-    # Format the chat history
-    formatted_history = format_chat_history(st.session_state.chat_history)
-    
-    # Start the chat with the formatted history
-    chat_session = model.start_chat(history=formatted_history)
+    chat_session = model.start_chat(history=[])
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
@@ -132,6 +114,7 @@ def get_response(context, question, model):
     السياق: {context}\n
     السؤال: {question}\n
     """
+
 
     try:
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
@@ -144,11 +127,6 @@ def get_response(context, question, model):
                     return "", None, None
 
         logging.info(f"AI Response: {response_text}")
-        
-        # إضافة السؤال والرد إلى سجل الدردشة
-        st.session_state.chat_history.append({"role": "user", "content": question})
-        st.session_state.chat_history.append({"role": "assistant", "content": response_text})
-        
         return response_text
     except Exception as e:
         logging.warning(e)
@@ -184,6 +162,7 @@ def generate_response(query_request: QueryRequest):
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
 
+
 def clean_json_response(response_text):
     try:
         response_json = json.loads(response_text)
@@ -204,7 +183,6 @@ def clean_json_response(response_text):
         except (ValueError, json.JSONDecodeError) as e:
             logging.error(f"Response is not a valid JSON: {str(e)}")
             return None
-
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""
@@ -235,7 +213,7 @@ def extract_reference_texts_as_json(response_text, context):
             "top_k": 1,
             "max_output_tokens": 8000,
         }
-    ).start_chat(history=format_chat_history(st.session_state.chat_history))
+    ).start_chat(history=[])
     
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
@@ -377,7 +355,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
 
     try:
-        response = model.start_chat(history=format_chat_history(st.session_state.chat_history)).send_message(prompt_template)
+        response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
         logging.info(f"Model Response: {response_text}")  # Log the model's response
@@ -440,6 +418,8 @@ def get_playlist_videos(playlist_id):
         {"title": "كيف نمارس مواطنتنا في المدرسة؟", "video_id": "ghi789"}
     ]
 
+
+
 # Streamlit UI Components
 import streamlit as st
 
@@ -484,6 +464,7 @@ st.write("---")
 st.write("")
 st.write("")
 st.write("")
+
 
 # استخدام st.button مع نفس النص لتقديم نفس الوظيفة
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):

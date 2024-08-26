@@ -104,17 +104,28 @@ def process_lessons_and_video():
 class QueryRequest(BaseModel):
     query: str
 
+
 def get_response(context, question, model):
     # Convert chat history to the expected format
     formatted_history = []
     for entry in st.session_state.chat_history:
-        formatted_history.append({"role": "user", "content": {"text": entry["user"]}})
-        formatted_history.append({"role": "bot", "content": {"text": entry["bot"]}})
+        formatted_history.append({
+            "role": "user",
+            "content": {
+                "parts": [{"text": entry["user"]}]
+            }
+        })
+        formatted_history.append({
+            "role": "bot",
+            "content": {
+                "parts": [{"text": entry["bot"]}]
+            }
+        })
 
     chat_session = model.start_chat(history=formatted_history)
 
     prompt_template = """
-    أنت مساعد ذكي في مادة اللغة العربية للصف الرابع الابتدائي. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
+    أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
 قسم السياق إلى دروس ثم ادرسهم لتستطيع
     الإجابة على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي فقط.
 قدم إجابة واضحة تتناسب مع مستوى الصفوف الأولى.

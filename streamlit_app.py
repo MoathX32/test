@@ -194,7 +194,7 @@ def clean_json_response(response_text):
             cleaned_text = re.sub(r'```', '', cleaned_text).strip()
 
             match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
-            if match:
+            if match):
                 cleaned_text = match.group(0)
                 response_json = json.loads(cleaned_text)
                 return response_json
@@ -310,7 +310,7 @@ def find_video_segment(filenames, response_text, playlist_id):
 
     for filename in filenames:
         for video in videos:
-            if filename.lower() in video['title'].lower()):
+            if filename.lower() in video['title'].lower():
                 video_id = video['video_id']
                 relevant_video_urls[filename] = f"https://www.youtube.com/watch?v={video_id}"
                 break

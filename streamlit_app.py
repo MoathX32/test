@@ -105,11 +105,16 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_response(context, question, model):
-    # Use the chat history stored in session_state
-    chat_session = model.start_chat(history=st.session_state.chat_history)
+    # Convert chat history to the expected format
+    formatted_history = []
+    for entry in st.session_state.chat_history:
+        formatted_history.append({"role": "user", "content": entry["user"]})
+        formatted_history.append({"role": "bot", "content": entry["bot"]})
+
+    chat_session = model.start_chat(history=formatted_history)
 
     prompt_template = """
-    أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
+    أنت مساعد ذكي في مادة اللغة العربية للصف الرابع الابتدائي. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
 قسم السياق إلى دروس ثم ادرسهم لتستطيع
     الإجابة على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي فقط.
 قدم إجابة واضحة تتناسب مع مستوى الصفوف الأولى.
@@ -122,7 +127,7 @@ def get_response(context, question, model):
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
 
-        # Update chat history
+        # Update chat history in the correct format
         st.session_state.chat_history.append({"user": question, "bot": response_text})
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:

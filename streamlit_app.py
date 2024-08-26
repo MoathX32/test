@@ -502,7 +502,7 @@ if st.session_state.processing_complete:
             # نموذج لإنشاء الأسئلة
             with st.form(key='questions_form'):
                 question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-                questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=10)
+                questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
                 generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
                 if generate_questions_button:

@@ -112,13 +112,13 @@ def get_response(context, question, model):
         formatted_history.append({
             "role": "user",
             "content": {
-                "parts": [{"text": entry["user"]}]
+                "text": entry["user"]
             }
         })
         formatted_history.append({
             "role": "bot",
             "content": {
-                "parts": [{"text": entry["bot"]}]
+                "text": entry["bot"]
             }
         })
 

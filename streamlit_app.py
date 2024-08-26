@@ -105,15 +105,15 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_response(context, question, model):
-    # استخدام التاريخ من session_state
+    # Use the chat history stored in session_state
     chat_session = model.start_chat(history=st.session_state.chat_history)
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
-قسم السياق الى دروس ثم ادرسهم لتستطيع
-    الاجابه على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي فقط. 
+قسم السياق إلى دروس ثم ادرسهم لتستطيع
+    الإجابة على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي فقط.
 قدم إجابة واضحة تتناسب مع مستوى الصفوف الأولى.
-يمكنك ان تكون متشابهات وجمل وامثله وتعيد صياغة النصوص والشرح
+يمكنك أن تكون متشابهات وجمل وأمثلة وتعيد صياغة النصوص والشرح.
     السياق: {context}\n
     السؤال: {question}\n
     """
@@ -122,7 +122,7 @@ def get_response(context, question, model):
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
 
-        # تحديث تاريخ الدردشة
+        # Update chat history
         st.session_state.chat_history.append({"user": question, "bot": response_text})
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
@@ -229,7 +229,6 @@ def extract_reference_texts_as_json(response_text, context):
 def generate_reference_texts():
     if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
         raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
-
     
     response_text = st.session_state.vector_stores['response_text']
     
@@ -260,7 +259,7 @@ def generate_reference_texts():
         "لا يوجد معلومات",
         "لم تحدد",
         "هل يمكنك",
-        "لا استطيع" ,
+        "لا أستطيع" ,
         "غير قادر",
         "لم يذكر",
         "لم تتحدث",

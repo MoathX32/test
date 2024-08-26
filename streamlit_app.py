@@ -105,7 +105,7 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_response(context, question, model):
-    chat_session = model.start_chat(history=[])
+    chat_session = model.start_chat(history=st.session_state.chat_history)
 
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
@@ -128,6 +128,11 @@ def get_response(context, question, model):
                     return "", None, None
 
         logging.info(f"AI Response: {response_text}")
+        
+        # إضافة السؤال والرد إلى سجل الدردشة
+        st.session_state.chat_history.append({"role": "user", "content": question})
+        st.session_state.chat_history.append({"role": "assistant", "content": response_text})
+        
         return response_text
     except Exception as e:
         logging.warning(e)
@@ -160,13 +165,6 @@ def generate_response(query_request: QueryRequest):
     )
     
     response = get_response(context, query_request.query, model)
-    
-    # حفظ السؤال والرد في سجل الدردشة
-    st.session_state.chat_history.append({
-        "query": query_request.query,
-        "response": response
-    })
-    
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
 
@@ -220,7 +218,7 @@ def extract_reference_texts_as_json(response_text, context):
             "top_k": 1,
             "max_output_tokens": 8000,
         }
-    ).start_chat(history=[])
+    ).start_chat(history=st.session_state.chat_history)
     
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
@@ -362,7 +360,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
 
     try:
-        response = model.start_chat(history=[]).send_message(prompt_template)
+        response = model.start_chat(history=st.session_state.chat_history).send_message(prompt_template)
         response_text = response.text.strip()
 
         logging.info(f"Model Response: {response_text}")  # Log the model's response
@@ -520,12 +518,3 @@ if st.session_state.processing_complete:
             if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
                 video_segment_urls = generate_video_segment_url()
                 st.write("Generated Video Segment URLs:", video_segment_urls)
-
-st.write("---")
-st.subheader("سجل الدردشة")
-
-# عرض سجل الدردشة
-for entry in st.session_state.chat_history:
-    st.write(f"**سؤال:** {entry['query']}")
-    st.write(f"**رد:** {entry['response']}")
-    st.write("---")

@@ -104,48 +104,32 @@ def process_lessons_and_video():
 class QueryRequest(BaseModel):
     query: str
 
-
 def get_response(context, question, model):
-    # Convert chat history to the expected format
-    formatted_history = []
-    for entry in st.session_state.chat_history:
-        formatted_history.append({
-            "role": "user",
-            "content": {
-                "text": entry["user"]
-            }
-        })
-        formatted_history.append({
-            "role": "bot",
-            "content": {
-                "text": entry["bot"]
-            }
-        })
-
-    chat_session = model.start_chat(history=formatted_history)
-
+    # Prepare the prompt by including the previous conversation history
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
-قسم السياق إلى دروس ثم ادرسهم لتستطيع
-    الإجابة على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي فقط.
-قدم إجابة واضحة تتناسب مع مستوى الصفوف الأولى.
-يمكنك أن تكون متشابهات وجمل وأمثلة وتعيد صياغة النصوص والشرح.
+    أجب على السؤال التالي باستخدام النص الموجود في السياق المرجعي أدناه فقط. قدم إجابة بسيطة وواضحة تتناسب مع مستوى الصفوف الأولى.
+    يجب أن يكون الرد مختصرًا ومفهومًا.
+    لا تجب على أي سؤال خارج سياق النص.
+    
     السياق: {context}\n
     السؤال: {question}\n
     """
 
+    # Initialize or update the chat history
+    chat_history = st.session_state.get("chat_history", [])
+    chat_history.append({"role": "user", "content": question})
+
+    chat_session = model.start_chat(history=chat_history)
+
     try:
+        # Send the message and get the response
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
 
-        # Update chat history in the correct format
-        st.session_state.chat_history.append({"user": question, "bot": response_text})
-
-        if hasattr(response, 'safety_ratings') and response.safety_ratings:
-            for rating in response.safety_ratings:
-                if rating.probability != 'NEGLIGIBLE':
-                    logging.warning("Response flagged due to safety concerns.")
-                    return "", None, None
+        # Update chat history with the bot's response
+        chat_history.append({"role": "assistant", "content": response_text})
+        st.session_state.chat_history = chat_history
 
         logging.info(f"AI Response: {response_text}")
         return response_text
@@ -183,27 +167,6 @@ def generate_response(query_request: QueryRequest):
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
 
-def clean_json_response(response_text):
-    try:
-        response_json = json.loads(response_text)
-        return response_json
-    except json.JSONDecodeError:
-        try:
-            cleaned_text = re.sub(r'```json', '', response_text).strip()
-            cleaned_text = re.sub(r'```', '', cleaned_text).strip()
-
-            match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
-            if match:
-                cleaned_text = match.group(0)
-                response_json = json.loads(cleaned_text)
-                return response_json
-            else:
-                logging.error("No JSON object or array found in response")
-                return None
-        except (ValueError, json.JSONDecodeError) as e:
-            logging.error(f"Response is not a valid JSON: {str(e)}")
-            return None
-
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""
     بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية، والتي يجب أن تتضمن عناوين دروس مثل "درس: قواعد اللغة العربية" أو "درس: أدب العصر العباسي".
@@ -238,7 +201,10 @@ def extract_reference_texts_as_json(response_text, context):
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
 
-    reference_texts_json = clean_json_response(ref_response_text)
+    try:
+        reference_texts_json = json.loads(ref_response_text)
+    except json.JSONDecodeError:
+        reference_texts_json = None
     
     return reference_texts_json
 
@@ -247,49 +213,6 @@ def generate_reference_texts():
         raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
     
     response_text = st.session_state.vector_stores['response_text']
-    
-    invalid_phrases = [
-        "لا يمكنني الإجابة", 
-        "النص غير مكتمل", 
-        "السؤال غير واضح", 
-        "خارج المنهج", 
-        "غير مرتبط", 
-        "تصحيح", 
-        "مرحبا", 
-        "أهلا", 
-        "السلام عليكم", 
-        "تحية", 
-        "صباح الخير", 
-        "مساء الخير", 
-        "غير قادر", 
-        "لم أتمكن", 
-        "لا أستطيع", 
-        "غير مفهوم", 
-        "لم أتمكن من الفهم", 
-        "لا أفهم", 
-        "سؤال ناقص", 
-        "سؤال غير مكتمل", 
-        "لا تتعلق", 
-        "هذا ليس جزءًا من", 
-        "لم يتم العثور على", 
-        "لا يوجد معلومات",
-        "لم تحدد",
-        "هل يمكنك",
-        "لا أستطيع" ,
-        "غير قادر",
-        "لم يذكر",
-        "لم تتحدث",
-        "من فضلك",
-        "لا يوجد",
-        "السياق المذكور",
-        "لم تحدد",
-        "لا يتضمن إجابة"
-    ]
-
-    if any(phrase in response_text for phrase in invalid_phrases):
-        logging.warning("The response_text is invalid or incomplete.")
-        st.session_state.reference_texts_store["last_reference_texts"] = None
-        return None
 
     context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
 
@@ -380,18 +303,12 @@ def generate_questions(relevant_text, num_questions, question_type, model):
 
         logging.info(f"Model Response: {response_text}")  # Log the model's response
 
-        if response_text:
-            response_json = clean_json_response(response_text)
-            if response_json:
-                return response_json
-            else:
-                logging.warning("Failed to decode JSON from model response.")
-                st.error("Failed to decode JSON from the model's response.")
-                return None
-        else:
-            logging.warning("Received an empty response from the model.")
-            st.error("Received an empty response from the model.")
-            return None
+        try:
+            response_json = json.loads(response_text)
+        except json.JSONDecodeError:
+            response_json = None
+
+        return response_json
     except Exception as e:
         logging.warning(f"Error: {e}")
         st.error(f"Error generating questions: {e}")

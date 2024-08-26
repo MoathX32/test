@@ -108,8 +108,8 @@ def get_response(context, question, model):
     # Convert chat history to the expected format
     formatted_history = []
     for entry in st.session_state.chat_history:
-        formatted_history.append({"role": "user", "content": entry["user"]})
-        formatted_history.append({"role": "bot", "content": entry["bot"]})
+        formatted_history.append({"role": "user", "content": {"text": entry["user"]}})
+        formatted_history.append({"role": "bot", "content": {"text": entry["bot"]}})
 
     chat_session = model.start_chat(history=formatted_history)
 

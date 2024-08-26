@@ -32,6 +32,8 @@ if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -115,7 +117,6 @@ def get_response(context, question, model):
     السؤال: {question}\n
     """
 
-
     try:
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
@@ -159,9 +160,15 @@ def generate_response(query_request: QueryRequest):
     )
     
     response = get_response(context, query_request.query, model)
+    
+    # حفظ السؤال والرد في سجل الدردشة
+    st.session_state.chat_history.append({
+        "query": query_request.query,
+        "response": response
+    })
+    
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
-
 
 def clean_json_response(response_text):
     try:
@@ -418,8 +425,6 @@ def get_playlist_videos(playlist_id):
         {"title": "كيف نمارس مواطنتنا في المدرسة؟", "video_id": "ghi789"}
     ]
 
-
-
 # Streamlit UI Components
 import streamlit as st
 
@@ -464,7 +469,6 @@ st.write("---")
 st.write("")
 st.write("")
 st.write("")
-
 
 # استخدام st.button مع نفس النص لتقديم نفس الوظيفة
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
@@ -516,3 +520,12 @@ if st.session_state.processing_complete:
             if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
                 video_segment_urls = generate_video_segment_url()
                 st.write("Generated Video Segment URLs:", video_segment_urls)
+
+st.write("---")
+st.subheader("سجل الدردشة")
+
+# عرض سجل الدردشة
+for entry in st.session_state.chat_history:
+    st.write(f"**سؤال:** {entry['query']}")
+    st.write(f"**رد:** {entry['response']}")
+    st.write("---")

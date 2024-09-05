@@ -216,7 +216,15 @@ def extract_reference_texts_as_json(response_text, context):
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
 
+    # تسجيل النص المستلم لفحصه
+    logging.info(f"Reference response text: {ref_response_text}")
+
     reference_texts_json = clean_json_response(ref_response_text)
+    
+    if reference_texts_json is None:
+        logging.warning("Failed to parse JSON from reference response.")
+    else:
+        logging.info(f"Parsed reference texts JSON: {reference_texts_json}")
     
     return reference_texts_json
 
@@ -287,35 +295,31 @@ def generate_questions_endpoint(question_request: QuestionRequest):
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         raise HTTPException(status_code=400, detail="No reference texts found. Please process the reference texts first.")
     
-    if st.session_state.reference_texts_store.get("last_reference_texts") is None:
-        logging.error("Cannot generate questions because reference texts are None.")
-        raise HTTPException(status_code=400, detail="Reference texts are None. Cannot generate questions.")
-
-    generation_config = {
-        "temperature": 0.2,
-        "top_p": 1,
-        "top_k": 1,
-        "max_output_tokens": 8000,
-    }
-
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
-        generation_config=generation_config,
-        system_instruction="You are a helpful document answering assistant."
-    )
-
     reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
+    
+    # فحص هيكل البيانات المستلمة
     if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], list):
         relevant_texts = " ".join([ref["relevant_texts"] for ref in reference_texts["reference_texts"]])
+        logging.info(f"Relevant texts extracted: {relevant_texts}")
     else:
         st.error("النصوص المرجعية غير صحيحة.")
+        logging.error(f"Reference texts structure: {reference_texts}")
         return None
 
     questions_json = generate_questions(
         relevant_text=relevant_texts,
         num_questions=question_request.questions_number,
         question_type=question_request.question_type,
-        model=model
+        model=genai.GenerativeModel(
+            model_name="gemini-1.5-pro-latest",
+            generation_config={
+                "temperature": 0.2,
+                "top_p": 1,
+                "top_k": 1,
+                "max_output_tokens": 8000,
+            },
+            system_instruction="You are a helpful document answering assistant."
+        )
     )
 
     return questions_json

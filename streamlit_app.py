@@ -25,7 +25,7 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
-# Initialize global stores
+# Initialize session state
 if "vector_stores" not in st.session_state:
     st.session_state.vector_stores = {}
 if "reference_texts_store" not in st.session_state:
@@ -34,6 +34,12 @@ if "document_store" not in st.session_state:
     st.session_state.document_store = []
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []  # Store the chat history
+if "processing_complete" not in st.session_state:
+    st.session_state.processing_complete = False  # Flag to check if processing is done
+if "response_submitted" not in st.session_state:
+    st.session_state.response_submitted = False  # Flag to check if a response has been submitted
+if "sources_shown" not in st.session_state:
+    st.session_state.sources_shown = False  # Flag to check if sources have been shown
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -202,7 +208,17 @@ def generate_response(query_request: QueryRequest):
 
     return response
 
-# Inside Streamlit form (UI for query input and response generation)
+# Streamlit UI Components
+st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
+
+if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
+    with st.spinner('جاري معالجة الملفات...'):
+       process_lessons_and_video()  # استدعاء الدالة لمعالجة الملفات
+    st.session_state.processing_complete = True  # تحديث حالة المعالجة
+
+st.write("---")
+
+# إظهار النموذج response_form فقط إذا تمت معالجة الملفات
 if st.session_state.processing_complete:
     with st.form(key='response_form'):
         query = st.text_input("كيف يمكنني مساعدتك:")

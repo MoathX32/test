@@ -152,7 +152,7 @@ def get_response(context, question, model):
 
         # Append the question and response to the chat history
         chat_history.append({"role": "user", "content": question})
-        chat_history.append({"role": "model", "content": response_text})
+        chat_history.append({"role": "assistant", "content": response_text})
 
         # Store the updated chat history in the session state
         st.session_state.chat_history = chat_history
@@ -170,7 +170,7 @@ def display_chat_history():
         for message in st.session_state.chat_history:
             if message["role"] == "user":
                 st.write(f"**You**: {message['content']}")
-            elif message["role"] == "model":
+            elif message["role"] == "assistant":
                 st.write(f"**Assistant**: {message['content']}")
     else:
         st.write("No conversation history available.")

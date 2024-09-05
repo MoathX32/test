@@ -293,7 +293,12 @@ def generate_questions_endpoint(question_request: QuestionRequest):
         system_instruction="You are a helpful document answering assistant."
     )
 
-    relevant_texts = " ".join([ref["relevant_texts"] for ref in st.session_state.reference_texts_store["last_reference_texts"]["reference_texts"]])
+    reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
+    if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], list):
+        relevant_texts = " ".join([ref["relevant_texts"] for ref in reference_texts["reference_texts"]])
+    else:
+        st.error("النصوص المرجعية غير صحيحة.")
+        return None
 
     questions_json = generate_questions(
         relevant_text=relevant_texts,

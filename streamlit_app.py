@@ -25,11 +25,22 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
-# Initialize global stores
+# Initialize session state variables
+if "processing_complete" not in st.session_state:
+    st.session_state.processing_complete = False
+
+if "response_submitted" not in st.session_state:
+    st.session_state.response_submitted = False
+
+if "sources_shown" not in st.session_state:
+    st.session_state.sources_shown = False
+
 if "vector_stores" not in st.session_state:
     st.session_state.vector_stores = {}
+
 if "reference_texts_store" not in st.session_state:
     st.session_state.reference_texts_store = {}
+
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
 
@@ -311,13 +322,6 @@ def generate_questions_endpoint(question_request: QuestionRequest):
 
 # Streamlit UI Components
 import streamlit as st
-
-# التحقق من وجود الحالات في session_state
-if "processing_complete" not in st.session_state:
-    st.session_state.processing_complete = False
-
-if "response_submitted" not in st.session_state:
-    st.session_state.response_submitted = False
 
 # عنوان الصفحة
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")

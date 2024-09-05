@@ -114,8 +114,13 @@ def get_response(context, question, model):
     # Retrieve the existing chat history from session state
     chat_history = st.session_state.chat_history
     
-    # Start a new chat session, passing in the chat history
-    chat_session = model.start_chat(history=chat_history)
+    # Start a new chat session, passing in the chat history in the correct format
+    chat_session = model.start_chat(history=[
+        {"author": "user", "content": message["content"]}
+        if message["role"] == "user" else
+        {"author": "assistant", "content": message["content"]}
+        for message in chat_history
+    ])
 
     # Define the prompt template
     prompt_template = """

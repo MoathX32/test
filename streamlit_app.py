@@ -5,7 +5,7 @@ import logging
 import streamlit as st
 from fastapi import HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List
 from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -82,7 +82,6 @@ def get_vector_store(documents):
 
 def process_lessons_and_video():
     folder_path = "./Data"  # Automatically set to the "Data" folder in the current directory
-    playlist_url = "https://www.youtube.com/watch?v=DFyPl2cZM2g&list=PLX1bW_GeBRhDkTf_jbdvBbkHs2LCWVeXZ"  # Always set to the provided URL
 
     pdf_docs_with_names = read_files_from_folder(folder_path)
     if not pdf_docs_with_names or any(len(pdf) == 0 for pdf, _ in pdf_docs_with_names):
@@ -91,13 +90,10 @@ def process_lessons_and_video():
     documents = get_all_pdfs_chunks(pdf_docs_with_names)
     pdf_vectorstore = get_vector_store(documents)
 
-    playlist_id = playlist_url.split("list=")[-1].split("&")[0]
-
     st.session_state.vector_stores["pdf_vectorstore"] = pdf_vectorstore
-    st.session_state.vector_stores["playlist_id"] = playlist_id
     st.session_state.document_store.extend(documents)  # Store original documents
 
-    st.success("PDFs and playlist processed successfully")
+    st.success("PDFs processed successfully")
 
 class QueryRequest(BaseModel):
     query: str
@@ -162,7 +158,6 @@ def generate_response(query_request: QueryRequest):
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
 
-
 def clean_json_response(response_text):
     try:
         response_json = json.loads(response_text)
@@ -186,17 +181,9 @@ def clean_json_response(response_text):
 
 def extract_reference_texts_as_json(response_text, context):
     ref_prompt = f"""
-    بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية، والتي يجب أن تتضمن عناوين دروس مثل "درس: قواعد اللغة العربية" أو "درس: أدب العصر العباسي".
+    بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية.
     قدم العنوان الرئيسي للدرس كمفتاح 'filename'، وأضف النص الأكثر ارتباطًا فقط تحت مفتاح 'relevant_texts'.
     
-    يجب أن يكون الإخراج بتنسيق JSON يتضمن 'filename' و 'relevant_texts' كما هو موضح:
-    [
-        {{
-            "filename": "عنوان الدرس",
-            "relevant_texts": "النص الأكثر ارتباطًا فقط"
-        }}
-    ]
-
     الإجابة: {response_text}
 
     ابحث في السياق المرجعي التالي عن المعلومات التي تدعم هذه الإجابة:
@@ -227,49 +214,6 @@ def generate_reference_texts():
         raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
     
     response_text = st.session_state.vector_stores['response_text']
-    
-    invalid_phrases = [
-        "لا يمكنني الإجابة", 
-        "النص غير مكتمل", 
-        "السؤال غير واضح", 
-        "خارج المنهج", 
-        "غير مرتبط", 
-        "تصحيح", 
-        "مرحبا", 
-        "أهلا", 
-        "السلام عليكم", 
-        "تحية", 
-        "صباح الخير", 
-        "مساء الخير", 
-        "غير قادر", 
-        "لم أتمكن", 
-        "لا أستطيع", 
-        "غير مفهوم", 
-        "لم أتمكن من الفهم", 
-        "لا أفهم", 
-        "سؤال ناقص", 
-        "سؤال غير مكتمل", 
-        "لا تتعلق", 
-        "هذا ليس جزءًا من", 
-        "لم يتم العثور على", 
-        "لا يوجد معلومات",
-        "لم تحدد",
-        "هل يمكنك",
-        "لا استطيع" ,
-        "غير قادر",
-        "لم يذكر",
-        "لم تتحدث",
-        "من فضلك",
-        "لا يوجد",
-        "السياق المذكور",
-        "لم تحدد",
-        "لا يتضمن إجابة"
-    ]
-
-    if any(phrase in response_text for phrase in invalid_phrases):
-        logging.warning("The response_text is invalid or incomplete.")
-        st.session_state.reference_texts_store["last_reference_texts"] = None
-        return None
 
     context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
 
@@ -282,50 +226,6 @@ def generate_reference_texts():
         st.session_state.reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
     
     return reference_texts
-
-def find_video_segment(filenames, response_text, playlist_id):
-    videos = get_playlist_videos(playlist_id)
-    relevant_video_urls = {}
-
-    for filename in filenames:
-        for video in videos:
-            if filename.lower() in video['title'].lower():
-                video_id = video['video_id']
-                relevant_video_urls[filename] = f"https://www.youtube.com/watch?v={video_id}"
-                break
-
-    if not relevant_video_urls:
-        logging.warning(f"No matching video found for lessons: {filenames}")
-        return None
-
-    return relevant_video_urls
-
-def generate_video_segment_url():
-    if "playlist_id" not in st.session_state.vector_stores or "last_reference_texts" not in st.session_state.reference_texts_store:
-        logging.error("Required data not found: playlist_id or last_reference_texts.")
-        raise HTTPException(status_code=400, detail="Playlist and reference texts must be processed first.")
-    
-    if st.session_state.reference_texts_store.get("last_reference_texts") is None:
-        logging.error("Cannot generate video segment URLs because reference texts are None.")
-        raise HTTPException(status_code=400, detail="Reference texts are None. Cannot generate video segment URLs.")
-
-    playlist_id = st.session_state.vector_stores.get("playlist_id")
-    reference_texts = st.session_state.reference_texts_store.get("last_reference_texts")
-    
-    filenames = [ref["filename"] for ref in reference_texts["reference_texts"]]
-    response_text = st.session_state.vector_stores["response_text"]
-
-    if not filenames:
-        logging.error("Lesson names are missing from the reference texts.")
-        return None
-
-    video_segment_urls = find_video_segment(filenames, response_text, playlist_id)
-    
-    if not video_segment_urls:
-        logging.error(f"Video segments not found for lessons: {filenames}.")
-        raise HTTPException(status_code=404, detail="Not Found")
-
-    return video_segment_urls
 
 class QuestionRequest(BaseModel):
     question_type: str
@@ -341,20 +241,15 @@ def generate_questions(relevant_text, num_questions, question_type, model):
     if question_type == "MCQ":
         prompt_template = f"""
         You are an AI assistant tasked with generating exactly {num_questions} multiple-choice questions (MCQs) from the given context. 
-        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided, but also feel free to generate questions based on the broader context even if not directly mentioned in the text.
-        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
-        Ensure the output includes diverse examples that test different aspects of the context. The correct answer should be clearly indicated.
-        The questions should be formatted in JSON with fields 'question', 'options', and 'correct_answer'. Ensure the output language matches the context language.
+        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided.
+        The questions should be formatted in JSON with fields 'question', 'options', and 'correct_answer'.
         
         Context: {relevant_text}\n
         """
     else:
         prompt_template = f"""
         You are an AI assistant tasked with generating exactly {num_questions} true/false questions from the given context. 
-        Create a variety of true/false questions that not only test the information directly presented in the text but also draw on the broader context.
-        It is critical that you generate the exact number of questions requested ({num_questions}). If necessary, create questions that infer or expand upon the context.
-        Ensure the output includes different examples that challenge the understanding of the context. The correct answer should be provided for each question.
-        The questions should be formatted in JSON with fields 'question' and 'correct_answer'. Ensure the output language matches the context language.
+        The questions should be formatted in JSON with fields 'question' and 'correct_answer'. 
         
         Context: {relevant_text}\n
         """
@@ -363,20 +258,11 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
-        logging.info(f"Model Response: {response_text}")  # Log the model's response
+        logging.info(f"Model Response: {response_text}")
 
         if response_text:
             response_json = clean_json_response(response_text)
-            if response_json:
-                # Check if the number of generated questions matches the required number
-                if len(response_json) < num_questions:
-                    logging.warning(f"Generated {len(response_json)} questions out of {num_questions} requested.")
-                    st.warning(f"Only {len(response_json)} questions were generated out of the requested {num_questions}.")
-                return response_json
-            else:
-                logging.warning("Failed to decode JSON from model response.")
-                st.error("Failed to decode JSON from the model's response.")
-                return None
+            return response_json if response_json else None
         else:
             logging.warning("Received an empty response from the model.")
             st.error("Received an empty response from the model.")
@@ -385,7 +271,6 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         logging.warning(f"Error: {e}")
         st.error(f"Error generating questions: {e}")
         return None
-
 
 def generate_questions_endpoint(question_request: QuestionRequest):
     if "last_reference_texts" not in st.session_state.reference_texts_store:
@@ -419,17 +304,6 @@ def generate_questions_endpoint(question_request: QuestionRequest):
 
     return questions_json
 
-def get_playlist_videos(playlist_id):
-    # Mock implementation
-    # This should be replaced with actual code that interacts with YouTube API to fetch playlist videos
-    return [
-        {"title": "حقوقي وواجباتي في البيت", "video_id": "abc123"},
-        {"title": "كيف تنتخب مجلس القسم؟", "video_id": "def456"},
-        {"title": "كيف نمارس مواطنتنا في المدرسة؟", "video_id": "ghi789"}
-    ]
-
-
-
 # Streamlit UI Components
 import streamlit as st
 
@@ -439,9 +313,6 @@ if "processing_complete" not in st.session_state:
 
 if "response_submitted" not in st.session_state:
     st.session_state.response_submitted = False
-
-if "sources_shown" not in st.session_state:
-    st.session_state.sources_shown = False
 
 # عنوان الصفحة
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
@@ -454,18 +325,12 @@ with st.expander("إرشادات الاستخدام"):
 
     **إرشادات المستخدم لواجهة Streamlit:**
     1. **تشغيل المساعد:**
-       عند فتح واجهة Streamlit، ستجد زرًا بعنوان "ابدأ تشغيل المساعد". بالضغط على هذا الزر، يبدأ البرنامج في معالجة ملفات PDF الموجودة في مجلد Data وتحليل محتوى الفيديوهات من قائمة تشغيل YouTube المحددة.
+       عند فتح واجهة Streamlit، ستجد زرًا بعنوان "ابدأ تشغيل المساعد". بالضغط على هذا الزر، يبدأ البرنامج في معالجة ملفات PDF الموجودة في مجلد Data.
     2. **طرح سؤال:**
        في الجزء المخصص للأسئلة، يمكنك إدخال سؤالك في حقل النص "كيف يمكنني مساعدتك". بعد إدخال السؤال، اضغط على زر "أجب". سيقوم البرنامج بمعالجة سؤالك بناءً على النصوص المستخرجة من ملفات PDF ويعرض الرد في الأسفل.
-    3. **عرض المصادر:**
-       بعد الحصول على الرد على سؤالك، يمكنك الضغط على زر "المصادر" لعرض النصوص المرجعية من ملفات PDF التي تم استخدامها لتكوين الإجابة.
-    4. **إنشاء أسئلة اختبار:**
+    3. **إنشاء أسئلة اختبار:**
        في قسم إنشاء الأسئلة، اختر نوع السؤال الذي ترغب في إنشائه (اختيارات متعددة "MCQ" أو صح/خطأ "True/False").
        حدد عدد الأسئلة باستخدام المؤشر، ثم اضغط على "ابدأ وضع الاختبار". سيتم عرض الأسئلة المتولدة بناءً على النصوص المرجعية.
-    5. **إنشاء روابط مقاطع الفيديو:**
-       إذا كنت قد قمت بمعالجة النصوص المرجعية وتحتاج إلى العثور على المقاطع المتعلقة بهذه النصوص في قائمة تشغيل YouTube، يمكنك الضغط على زر "Generate Video Segment URLs". سيقوم البرنامج بتوليد الروابط للمقاطع ذات الصلة ويعرضها لك.
-    6. **تنبيهات وأخطاء:**
-       إذا واجهتك أي أخطاء، ستظهر رسائل خطأ في الواجهة تشرح المشكلة، مثل عدم العثور على ملفات PDF، أو عدم القدرة على توليد الردود أو الأسئلة.
     """)
 
 st.write("---")
@@ -498,31 +363,23 @@ if st.session_state.processing_complete:
 
     st.write("---")
 
-    # إظهار زر المصادر فقط بعد تقديم الرد
+    # بعد تقديم الرد، استخراج النصوص المرجعية في الخلفية
     if st.session_state.response_submitted:
-        if st.session_state.get("vector_stores") and st.button("المصادر"):
-            reference_texts = generate_reference_texts()
-            st.write("النصوص من الكتاب:", reference_texts)
-            st.session_state.sources_shown = True  # تحديث حالة عرض المصادر
+        reference_texts = generate_reference_texts()
+        if reference_texts is not None:
+            st.session_state.sources_shown = True  # تحديث حالة استخراج المصادر
 
-        st.write("---")
+    st.write("---")
 
-        # إظهار باقي العناصر بعد عرض المصادر
-        if st.session_state.sources_shown:
-            # نموذج لإنشاء الأسئلة
-            with st.form(key='questions_form'):
-                question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-                questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
-                generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+    # إظهار باقي العناصر بعد تقديم الرد
+    if st.session_state.sources_shown:
+        # نموذج لإنشاء الأسئلة
+        with st.form(key='questions_form'):
+            question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+            questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
+            generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
-                if generate_questions_button:
-                    question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-                    questions = generate_questions_endpoint(question_request)
-                    st.write("الاختبار:", questions)
-
-            st.write("---")
-
-            # زر لتوليد روابط مقاطع الفيديو
-            if st.session_state.get("reference_texts_store") and st.button("Generate Video Segment URLs"):
-                video_segment_urls = generate_video_segment_url()
-                st.write("Generated Video Segment URLs:", video_segment_urls)
+            if generate_questions_button:
+                question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+                questions = generate_questions_endpoint(question_request)
+                st.write("الاختبار:", questions)

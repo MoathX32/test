@@ -1,11 +1,10 @@
 import os
 import io
-import json
 import logging
 import streamlit as st
 from fastapi import HTTPException
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List
 from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -13,7 +12,6 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 import google.generativeai as genai
-import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -152,7 +150,7 @@ def get_response(context, question, model):
 
         # Append the question and response to the chat history
         chat_history.append({"role": "user", "content": question})
-        chat_history.append({"role": "assistant", "content": response_text})
+        chat_history.append({"role": "model", "content": response_text})
 
         # Store the updated chat history in the session state
         st.session_state.chat_history = chat_history
@@ -170,7 +168,7 @@ def display_chat_history():
         for message in st.session_state.chat_history:
             if message["role"] == "user":
                 st.write(f"**You**: {message['content']}")
-            elif message["role"] == "assistant":
+            elif message["role"] == "model":
                 st.write(f"**Assistant**: {message['content']}")
     else:
         st.write("No conversation history available.")
@@ -220,20 +218,3 @@ st.title("مرحبا بك! أنا مساعد مادة اللغة العربية 
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
     with st.spinner('جاري معالجة الملفات...'):
        process_lessons_and_video()  # استدعاء الدالة لمعالجة الملفات
-    st.session_state.processing_complete = True  # تحديث حالة المعالجة
-
-st.write("---")
-
-# إظهار النموذج response_form فقط إذا تمت معالجة الملفات
-if st.session_state.processing_complete:
-    with st.form(key='response_form'):
-        query = st.text_input("كيف يمكنني مساعدتك:")
-        response_button = st.form_submit_button(label='أجب')
-
-        if response_button:
-            query_request = QueryRequest(query=query)
-            response = generate_response(query_request)
-            st.write("الرد:", response)
-
-    # Display the chat history even after response submission
-    display_chat_history()

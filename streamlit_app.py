@@ -120,10 +120,12 @@ def get_response(context, question, model):
     السؤال: {question}\n
     """
 
+    prompt = prompt_template.format(context=context, question=question)
+
     try:
-        # Directly send the query to the model without a chat session or history
-        response = model.send_message(prompt_template.format(context=context, question=question))
-        response_text = response.text
+        # Use model.generate() to directly get a response
+        response = model.generate(prompt)
+        response_text = response.generations[0].text  # Adjust based on response structure
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
             for rating in response.safety_ratings:
@@ -210,21 +212,27 @@ def extract_reference_texts_as_json(response_text, context):
             "max_output_tokens": 8000,
         }
     )
-    
-    ref_response = model.send_message(ref_prompt)
-    ref_response_text = ref_response.text.strip()
 
-    # Logging for debugging
-    logging.info(f"Reference response text: {ref_response_text}")
+    try:
+        # Generate the reference response directly
+        ref_response = model.generate(ref_prompt)
+        ref_response_text = ref_response.generations[0].text.strip()
 
-    reference_texts_json = clean_json_response(ref_response_text)
-    
-    if reference_texts_json is None:
-        logging.warning("Failed to parse JSON from reference response.")
-    else:
-        logging.info(f"Parsed reference texts JSON: {reference_texts_json}")
-    
-    return reference_texts_json
+        # Logging for debugging
+        logging.info(f"Reference response text: {ref_response_text}")
+
+        reference_texts_json = clean_json_response(ref_response_text)
+
+        if reference_texts_json is None:
+            logging.warning("Failed to parse JSON from reference response.")
+        else:
+            logging.info(f"Parsed reference texts JSON: {reference_texts_json}")
+
+        return reference_texts_json
+
+    except Exception as e:
+        logging.warning(f"Error generating reference texts: {e}")
+        return None
 
 def generate_reference_texts():
     if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
@@ -271,8 +279,8 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
 
     try:
-        response = model.send_message(prompt_template)
-        response_text = response.text.strip()
+        response = model.generate(prompt_template)
+        response_text = response.generations[0].text.strip()
 
         logging.info(f"Model Response: {response_text}")
 

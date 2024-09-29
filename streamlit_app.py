@@ -290,16 +290,22 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         logging.warning(f"Error: {e}")
         st.error(f"Error generating questions: {e}")
         return None
-
+    
 def generate_questions_endpoint(question_request: QuestionRequest):
     if "last_reference_texts" not in st.session_state.reference_texts_store:
         raise HTTPException(status_code=400, detail="No reference texts found. Please process the reference texts first.")
     
     reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
     
-    # فحص هيكل البيانات المستلمة
-    if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], list):
-        relevant_texts = " ".join([ref["relevant_texts"] for ref in reference_texts["reference_texts"]])
+    # Ensure that the reference texts are properly extracted
+    if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], dict):
+        relevant_texts = reference_texts["reference_texts"].get("relevant_texts", "")
+        
+        if not relevant_texts.strip():
+            logging.error("Relevant texts are empty or invalid.")
+            st.error("النصوص المرجعية غير صحيحة.")
+            return None
+
         logging.info(f"Relevant texts extracted: {relevant_texts}")
     else:
         st.error("النصوص المرجعية غير صحيحة.")

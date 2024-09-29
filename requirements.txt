@@ -7,3 +7,4 @@ langchain-google-genai
 google-generativeai
 langchain_community
 faiss-cpu
+langdetect

@@ -7,8 +7,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
 from PyPDF2 import PdfReader
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
-from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores.faiss import FAISS
@@ -25,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 # Load environment variables
 load_dotenv()
 genai_api_key = os.getenv("GENAI_API_KEY")
-youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+# youtube_api_key = os.getenv("YOUTUBE_API_KEY")  # Commented out as video section is disabled
 
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
@@ -229,10 +227,10 @@ def clean_json_response(response_text):
 
 # Streamlit UI Components
 
-st.title("AI Assistant for PDFs and YouTube Playlist Processing")
+st.title("AI Assistant for PDFs Processing")
 
-# Section to process PDFs and playlist
-if st.button('🚀 Process PDFs and Playlist 🚀'):
+# Section to process PDFs
+if st.button('🚀 Process PDFs 🚀'):
     with st.spinner('Processing files...'):
        process_lessons_and_video()  # Call the function to process PDFs
     st.session_state.processing_complete = True  # Update session state

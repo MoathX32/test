@@ -19,15 +19,14 @@ import re
 logging.basicConfig(level=logging.INFO)
 
 # Load environment variables
+# Load environment variables
 load_dotenv()
 genai_api_key = os.getenv("GENAI_API_KEY")
 
-# Validate API Key
-if not genai_api_key:
-    raise ValueError("GENAI_API_KEY environment variable is not set")
-
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
+
+
 
 # Initialize session state variables
 st.session_state.setdefault("processing_complete", False)

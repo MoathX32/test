@@ -23,7 +23,6 @@ logging.basicConfig(level=logging.INFO)
 # Load environment variables
 load_dotenv()
 genai_api_key = os.getenv("GENAI_API_KEY")
-# youtube_api_key = os.getenv("YOUTUBE_API_KEY")  # Commented out as video section is disabled
 
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
@@ -95,7 +94,7 @@ def get_vector_store(documents):
         logging.warning("Issue with creating the vector store.")
         raise HTTPException(status_code=500, detail="Issue with creating the vector store.")
 
-def process_lessons_and_video():
+def process_lessons():
     folder_path = "./Data"  # Automatically set to the "Data" folder in the current directory
 
     pdf_docs_with_names = read_files_from_folder(folder_path)
@@ -108,7 +107,7 @@ def process_lessons_and_video():
     st.session_state.vector_stores["pdf_vectorstore"] = pdf_vectorstore
     st.session_state.document_store.extend(documents)  # Store original documents
 
-    st.success("PDFs processed successfully")
+    st.success("تمت معالجة ملفات PDF بنجاح")
 
 class QueryRequest(BaseModel):
     query: str
@@ -117,11 +116,10 @@ def get_response(context, question, model):
     chat_session = model.start_chat(history=[])
 
     prompt_template = """
-    You are an AI assistant dedicated to answering questions based on the provided context.
-    Answer the following question based on the reference context below.
+    أنت مساعد ذكي متخصص في اللغة العربية. أجب عن السؤال التالي بناءً على النص المرجعي المتاح.
 
-    Context: {context}\n
-    Question: {question}\n
+    النص المرجعي: {context}\n
+    السؤال: {question}\n
     """
 
     try:
@@ -131,10 +129,10 @@ def get_response(context, question, model):
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
             for rating in response.safety_ratings:
                 if rating.probability != 'NEGLIGIBLE':
-                    logging.warning("Response flagged due to safety concerns.")
+                    logging.warning("تم الإبلاغ عن الإجابة لأسباب تتعلق بالسلامة.")
                     return "", None, None
 
-        logging.info(f"AI Response: {response_text}")
+        logging.info(f"إجابة الذكاء الاصطناعي: {response_text}")
         return response_text
     except Exception as e:
         logging.warning(e)
@@ -142,7 +140,7 @@ def get_response(context, question, model):
 
 def generate_response(query_request: QueryRequest):
     if "pdf_vectorstore" not in st.session_state.vector_stores:
-        st.error("PDFs must be processed first before generating a response.")
+        st.error("يجب معالجة ملفات PDF أولاً قبل توليد الإجابة.")
         return
 
     pdf_vectorstore = st.session_state.vector_stores['pdf_vectorstore']
@@ -163,7 +161,7 @@ def generate_response(query_request: QueryRequest):
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash",
         generation_config=generation_config,
-        system_instruction="You are a helpful document answering assistant."
+        system_instruction="أنت مساعد ذكي متخصص في تقديم إجابات دقيقة باللغة العربية."
     )
     
     response = get_response(context, query_request.query, model)
@@ -173,19 +171,17 @@ def generate_response(query_request: QueryRequest):
 def generate_questions(context, num_questions, question_type, model):
     if question_type == "MCQ":
         prompt_template = f"""
-        You are an AI assistant dedicated to the English language. Generate {num_questions} multiple-choice questions (MCQs) from the given context. 
-        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided and provide the correct answer as well. 
-        Ensure the output is in JSON format with fields 'question', 'options', and 'correct_answer'.
-        
-        Context: {context}\n
+        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على النص المرجعي المتاح.
+        يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة. تأكد من أن الأسئلة تغطي المفاهيم الأساسية من النص.
+
+        النص المرجعي: {context}\n
         """
     else:
         prompt_template = f"""
-        You are an AI assistant dedicated to the English language. Generate {num_questions} true/false questions from the given context. 
-        For each true/false question, provide the correct answer as well. 
-        Ensure the output is in JSON format with fields 'question' and 'correct_answer'.
-        
-        Context: {context}\n
+        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على النص المرجعي المتاح.
+        تأكد من أن كل سؤال يحتوي على الإجابة الصحيحة.
+
+        النص المرجعي: {context}\n
         """
 
     try:
@@ -201,7 +197,7 @@ def generate_questions(context, num_questions, question_type, model):
         else:
             return None
     except Exception as e:
-        logging.warning(f"Error: {e}")
+        logging.warning(f"خطأ: {e}")
         return None
 
 def clean_json_response(response_text):
@@ -219,43 +215,43 @@ def clean_json_response(response_text):
                 response_json = json.loads(cleaned_text)
                 return response_json
             else:
-                logging.error("No JSON object or array found in response")
+                logging.error("لم يتم العثور على كائن JSON في الاستجابة")
                 return None
         except (ValueError, json.JSONDecodeError) as e:
-            logging.error(f"Response is not a valid JSON: {str(e)}")
+            logging.error(f"الاستجابة ليست JSON صالحة: {str(e)}")
             return None
 
 # Streamlit UI Components
 
-st.title("AI Assistant for PDFs Processing")
+st.title("مساعد ذكي لمعالجة ملفات PDF")
 
 # Section to process PDFs
-if st.button('🚀 Process PDFs 🚀'):
-    with st.spinner('Processing files...'):
-       process_lessons_and_video()  # Call the function to process PDFs
+if st.button('🚀 معالجة ملفات PDF 🚀'):
+    with st.spinner('جارٍ معالجة الملفات...'):
+       process_lessons()  # Call the function to process PDFs
     st.session_state.processing_complete = True  # Update session state
 
 # Section for asking a query
 if st.session_state.processing_complete:
     with st.form(key='response_form'):
-        query = st.text_input("Ask a question related to the processed PDFs:")
-        response_button = st.form_submit_button(label='Submit')
+        query = st.text_input("اكتب سؤالك المتعلق بملفات PDF المعالجة:")
+        response_button = st.form_submit_button(label='إرسال')
 
         if response_button:
             query_request = QueryRequest(query=query)
             response = generate_response(query_request)
-            st.write("Response:", response)
+            st.write("الإجابة:", response)
 
 # Section to generate questions
 if st.session_state.processing_complete:
     with st.form(key='questions_form'):
-        question_type = st.selectbox("Choose question type:", ["MCQ", "True/False"])
-        questions_number = st.number_input("Number of questions:", min_value=1, max_value=10)
-        generate_button = st.form_submit_button(label='Generate Questions')
+        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "صح/خطأ"])
+        questions_number = st.number_input("عدد الأسئلة:", min_value=1, max_value=10)
+        generate_button = st.form_submit_button(label='توليد الأسئلة')
 
         if generate_button:
             if "pdf_vectorstore" not in st.session_state.vector_stores:
-                st.error("PDFs must be processed first before generating questions.")
+                st.error("يجب معالجة ملفات PDF أولاً قبل توليد الأسئلة.")
             else:
                 context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
                 model = genai.GenerativeModel(
@@ -263,4 +259,4 @@ if st.session_state.processing_complete:
                     generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000}
                 )
                 questions = generate_questions(context, questions_number, question_type, model)
-                st.write("Generated Questions:", questions)
+                st.write("الأسئلة المتولدة:", questions)

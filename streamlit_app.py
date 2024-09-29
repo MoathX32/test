@@ -183,25 +183,45 @@ def generate_questions_from_response(num_questions, question_type, model):
         return None
 
     if question_type == "MCQ":
-        # Updated prompt for intelligent question generation
+        # Improved prompt for enforcing JSON format
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على الإجابة التالية.
-        تأكد أن الأسئلة ذكية وتعتمد على التحليل، ويمكنك تقديم أمثلة لتوضيح المفاهيم. 
-        يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة، ويجب أن تبقى ضمن إطار الموضوع دون الخروج عنه.
-
-        الإجابة: {response_text}\n
+        تأكد أن الأسئلة ذكية وتعتمد على التحليل، ويمكنك تقديم أمثلة لتوضيح المفاهيم.
+        يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة، ويجب أن تكون الإجابة بصيغة JSON مع الحقول 'السؤال' و 'الخيارات' و 'الإجابة الصحيحة'.
+        
+        مثال على الإجابة بصيغة JSON:
+        [
+            {{
+                "السؤال": "ما هو الاسم؟",
+                "الخيارات": ["معنى يدل على فعل", "معنى يدل على شيء", "معنى يدل على حدث", "معنى يدل على زمن"],
+                "الإجابة الصحيحة": "معنى يدل على شيء"
+            }},
+            ...
+        ]
+        
+        الإجابة: {response_text}
         """
     else:
-        # Updated prompt for intelligent True/False question generation
+        # Improved prompt for True/False questions
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على الإجابة التالية.
         تأكد أن الأسئلة ذكية وتساهم في اختبار فهم الطالب، ويمكنك تقديم أمثلة إذا لزم الأمر.
-        يجب أن تحتوي الأسئلة على إجابات صحيحة، ويجب أن تبقى ضمن إطار الموضوع دون الخروج عنه.
+        يجب أن تكون الإجابة بصيغة JSON مع الحقول 'السؤال' و 'الإجابة الصحيحة'.
 
-        الإجابة: {response_text}\n
+        مثال على الإجابة بصيغة JSON:
+        [
+            {{
+                "السؤال": "الاسم يدل على معنى في ذاته.",
+                "الإجابة الصحيحة": "صح"
+            }},
+            ...
+        ]
+
+        الإجابة: {response_text}
         """
 
     try:
+        # Send the prompt to the model
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
@@ -225,10 +245,12 @@ def generate_questions_from_response(num_questions, question_type, model):
 
 def clean_json_response(response_text):
     try:
+        # Try loading the response as JSON
         response_json = json.loads(response_text)
         return response_json
     except json.JSONDecodeError:
         try:
+            # Clean up any irregularities in the response before attempting to parse JSON
             cleaned_text = re.sub(r'```json', '', response_text).strip()
             cleaned_text = re.sub(r'```', '', cleaned_text).strip()
 
@@ -243,6 +265,7 @@ def clean_json_response(response_text):
         except (ValueError, json.JSONDecodeError) as e:
             logging.error(f"الاستجابة ليست JSON صالحة: {str(e)}")
             return None
+
 
 # Streamlit UI Components
 

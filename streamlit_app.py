@@ -183,6 +183,7 @@ def generate_questions_from_response(num_questions, question_type, model):
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على الإجابة التالية.
         يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة. تأكد من أن الأسئلة تغطي المفاهيم الأساسية من النص.
+        يجب أن يكون المخرجات بصيغة JSON مع الحقول 'السؤال' و 'الخيارات' و 'الإجابة الصحيحة'.
 
         الإجابة: {response_text}\n
         """
@@ -190,26 +191,33 @@ def generate_questions_from_response(num_questions, question_type, model):
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على الإجابة التالية.
         تأكد من أن كل سؤال يحتوي على الإجابة الصحيحة.
+        يجب أن يكون المخرجات بصيغة JSON مع الحقول 'السؤال' و 'الإجابة الصحيحة'.
 
         الإجابة: {response_text}\n
         """
 
     try:
+        # Send the prompt to the model
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
+
+        # Log the response text to debug potential issues
+        logging.info(f"AI Model Response for questions: {response_text}")
 
         if response_text:
             response_json = clean_json_response(response_text)
             if response_json:
                 return response_json
             else:
+                logging.error("الاستجابة لم تكن بصيغة JSON. تأكد من صحة الصيغة في النموذج.")
+                st.error("لم يتم توليد الأسئلة بصيغة JSON. يرجى المحاولة مرة أخرى.")
                 return None
         else:
+            st.error("لم يتم استلام أي استجابة من النموذج.")
             return None
     except Exception as e:
         logging.warning(f"خطأ: {e}")
         return None
-
 def clean_json_response(response_text):
     try:
         response_json = json.loads(response_text)

@@ -118,8 +118,10 @@ class QueryRequest(BaseModel):
 def get_response(context, question, model):
     chat_session = model.start_chat(history=[])
 
+    # Updated prompt for response generation
     prompt_template = """
     أنت مساعد ذكي متخصص في اللغة العربية. أجب عن السؤال التالي بناءً على النص المرجعي المتاح.
+    يمكنك توليد محتوى إضافي وتقديم أمثلة تدعم الإجابة، بشرط أن تبقى ضمن إطار الموضوع دون الخروج عنه.
 
     النص المرجعي: {context}\n
     السؤال: {question}\n
@@ -140,6 +142,7 @@ def get_response(context, question, model):
     except Exception as e:
         logging.warning(e)
         return ""
+
 
 def generate_response(query_request: QueryRequest):
     if "pdf_vectorstore" not in st.session_state.vector_stores:
@@ -180,24 +183,25 @@ def generate_questions_from_response(num_questions, question_type, model):
         return None
 
     if question_type == "MCQ":
+        # Updated prompt for intelligent question generation
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على الإجابة التالية.
-        يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة. تأكد من أن الأسئلة تغطي المفاهيم الأساسية من النص.
-        يجب أن يكون المخرجات بصيغة JSON مع الحقول 'السؤال' و 'الخيارات' و 'الإجابة الصحيحة'.
+        تأكد أن الأسئلة ذكية وتعتمد على التحليل، ويمكنك تقديم أمثلة لتوضيح المفاهيم. 
+        يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة، ويجب أن تبقى ضمن إطار الموضوع دون الخروج عنه.
 
         الإجابة: {response_text}\n
         """
     else:
+        # Updated prompt for intelligent True/False question generation
         prompt_template = f"""
         أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على الإجابة التالية.
-        تأكد من أن كل سؤال يحتوي على الإجابة الصحيحة.
-        يجب أن يكون المخرجات بصيغة JSON مع الحقول 'السؤال' و 'الإجابة الصحيحة'.
+        تأكد أن الأسئلة ذكية وتساهم في اختبار فهم الطالب، ويمكنك تقديم أمثلة إذا لزم الأمر.
+        يجب أن تحتوي الأسئلة على إجابات صحيحة، ويجب أن تبقى ضمن إطار الموضوع دون الخروج عنه.
 
         الإجابة: {response_text}\n
         """
 
     try:
-        # Send the prompt to the model
         response = model.start_chat(history=[]).send_message(prompt_template)
         response_text = response.text.strip()
 
@@ -218,6 +222,7 @@ def generate_questions_from_response(num_questions, question_type, model):
     except Exception as e:
         logging.warning(f"خطأ: {e}")
         return None
+
 def clean_json_response(response_text):
     try:
         response_json = json.loads(response_text)

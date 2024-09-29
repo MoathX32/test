@@ -25,6 +25,25 @@ genai_api_key = os.getenv("GENAI_API_KEY")
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
+# Initialize session state variables
+if "processing_complete" not in st.session_state:
+    st.session_state.processing_complete = False
+
+if "response_submitted" not in st.session_state:
+    st.session_state.response_submitted = False
+
+if "sources_shown" not in st.session_state:
+    st.session_state.sources_shown = False
+
+if "vector_stores" not in st.session_state:
+    st.session_state.vector_stores = {}
+
+if "reference_texts_store" not in st.session_state:
+    st.session_state.reference_texts_store = {}
+
+if "document_store" not in st.session_state:
+    st.session_state.document_store = []
+
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
     if not pdf_bytes:
@@ -82,7 +101,10 @@ def process_lessons_and_video():
     documents = get_all_pdfs_chunks(pdf_docs_with_names)
     pdf_vectorstore = get_vector_store(documents)
 
-    return pdf_vectorstore, documents  # Return the vector store and documents
+    st.session_state.vector_stores["pdf_vectorstore"] = pdf_vectorstore
+    st.session_state.document_store.extend(documents)  # Store original documents
+
+    st.success("PDFs processed successfully")
 
 class QueryRequest(BaseModel):
     query: str
@@ -100,6 +122,7 @@ def get_response(context, question, model):
     السؤال: {question}\n
     """
 
+
     try:
         response = chat_session.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
@@ -116,8 +139,17 @@ def get_response(context, question, model):
         logging.warning(e)
         return ""
 
-def generate_response(query_request: QueryRequest, pdf_vectorstore):
+def generate_response(query_request: QueryRequest):
+    if "pdf_vectorstore" not in st.session_state.vector_stores:
+        st.error("PDFs must be processed first before generating a response.")
+        return
+
+    pdf_vectorstore = st.session_state.vector_stores['pdf_vectorstore']
+    
     relevant_content = pdf_vectorstore.similarity_search(query_request.query, k=20)
+    
+    st.session_state.vector_stores["relevant_content"] = relevant_content
+
     context = " ".join([doc.page_content for doc in relevant_content])
 
     generation_config = {
@@ -134,7 +166,8 @@ def generate_response(query_request: QueryRequest, pdf_vectorstore):
     )
     
     response = get_response(context, query_request.query, model)
-    return response, relevant_content  # Return the response and relevant content
+    st.session_state.vector_stores["response_text"] = response  # Store the response for later use
+    return response
 
 def clean_json_response(response_text):
     try:
@@ -183,6 +216,7 @@ def extract_reference_texts_as_json(response_text, context):
     ref_response = chat_session.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
 
+    # تسجيل النص المستلم لفحصه
     logging.info(f"Reference response text: {ref_response_text}")
 
     reference_texts_json = clean_json_response(ref_response_text)
@@ -194,14 +228,28 @@ def extract_reference_texts_as_json(response_text, context):
     
     return reference_texts_json
 
-def generate_reference_texts(response_text, relevant_content):
-    context = " ".join([doc.page_content for doc in relevant_content])
+def generate_reference_texts():
+    if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
+        raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
+    
+    response_text = st.session_state.vector_stores['response_text']
+
+    context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
+
     reference_texts = extract_reference_texts_as_json(response_text, context)
+    
+    if reference_texts is None:
+        logging.warning("No relevant reference texts found.")
+        st.session_state.reference_texts_store["last_reference_texts"] = None
+    else:
+        st.session_state.reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
+    
     return reference_texts
 
 class QuestionRequest(BaseModel):
     question_type: str
     questions_number: int
+
 
 def generate_questions(relevant_text, num_questions, question_type, model):
     if not relevant_text.strip():
@@ -242,38 +290,53 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         logging.warning(f"Error: {e}")
         st.error(f"Error generating questions: {e}")
         return None
+    
+def generate_questions_endpoint(question_request: QuestionRequest):
+    if "last_reference_texts" not in st.session_state.reference_texts_store:
+        raise HTTPException(status_code=400, detail="No reference texts found. Please process the reference texts first.")
+    
+    reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
+    
+    # Ensure that the reference texts are properly extracted
+    if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], dict):
+        relevant_texts = reference_texts["reference_texts"].get("relevant_texts", "")
+        
+        if not relevant_texts.strip():
+            logging.error("Relevant texts are empty or invalid.")
+            st.error("النصوص المرجعية غير صحيحة.")
+            return None
 
-def generate_questions_endpoint(question_request: QuestionRequest, reference_texts):
-    if not reference_texts:
+        logging.info(f"Relevant texts extracted: {relevant_texts}")
+    else:
         st.error("النصوص المرجعية غير صحيحة.")
+        logging.error(f"Reference texts structure: {reference_texts}")
         return None
 
-    relevant_texts = " ".join([ref["relevant_texts"] for ref in reference_texts])
-    logging.info(f"Relevant texts extracted: {relevant_texts}")
-
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
-        generation_config={
-            "temperature": 0.2,
-            "top_p": 1,
-            "top_k": 1,
-            "max_output_tokens": 8000,
-        },
-        system_instruction="You are a helpful document answering assistant."
-    )
-    
     questions_json = generate_questions(
         relevant_text=relevant_texts,
         num_questions=question_request.questions_number,
         question_type=question_request.question_type,
-        model=model
+        model=genai.GenerativeModel(
+            model_name="gemini-1.5-pro-latest",
+            generation_config={
+                "temperature": 0.2,
+                "top_p": 1,
+                "top_k": 1,
+                "max_output_tokens": 8000,
+            },
+            system_instruction="You are a helpful document answering assistant."
+        )
     )
 
     return questions_json
 
 # Streamlit UI Components
+import streamlit as st
+
+# عنوان الصفحة
 st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
+# إرشادات الاستخدام
 with st.expander("إرشادات الاستخدام"):
     st.write("""
     **تنبيه:**
@@ -291,42 +354,51 @@ with st.expander("إرشادات الاستخدام"):
 
 st.write("---")
 
-# Global variables to store the vector store and documents
-pdf_vectorstore = None
-documents = None
+# إضافة مساحات فارغة أعلى الصفحة لتوسيط الزر عموديًا
+st.write("")
+st.write("")
+st.write("")
 
-# Process lessons and video
+
+# استخدام st.button مع نفس النص لتقديم نفس الوظيفة
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
     with st.spinner('جاري معالجة الملفات...'):
-        pdf_vectorstore, documents = process_lessons_and_video()  
-    st.success("تمت معالجة الملفات بنجاح!")
+       process_lessons_and_video()  # استدعاء الدالة لمعالجة الملفات
+    st.session_state.processing_complete = True  # تحديث حالة المعالجة
 
 st.write("---")
 
-# Handle question form
-if pdf_vectorstore is not None:
+# إظهار النموذج response_form فقط إذا تمت معالجة الملفات
+if st.session_state.processing_complete:
     with st.form(key='response_form'):
         query = st.text_input("كيف يمكنني مساعدتك:")
         response_button = st.form_submit_button(label='أجب')
 
         if response_button:
             query_request = QueryRequest(query=query)
-            response, relevant_content = generate_response(query_request, pdf_vectorstore)
+            response = generate_response(query_request)
             st.write("الرد:", response)
-
-            # Generate reference texts
-            reference_texts = generate_reference_texts(response, relevant_content)
-            st.write("النصوص المرجعية:", reference_texts)
+            st.session_state.response_submitted = True  # تحديث حالة تقديم الرد
 
     st.write("---")
 
-    # Generate questions
-    with st.form(key='questions_form'):
-        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-        questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
-        generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+    # بعد تقديم الرد، استخراج النصوص المرجعية في الخلفية
+    if st.session_state.response_submitted:
+        reference_texts = generate_reference_texts()
+        if reference_texts is not None:
+            st.session_state.sources_shown = True  # تحديث حالة استخراج المصادر
 
-        if generate_questions_button:
-            question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-            questions = generate_questions_endpoint(question_request, reference_texts)
-            st.write("الاختبار:", questions)
+    st.write("---")
+
+    # إظهار باقي العناصر بعد تقديم الرد
+    if st.session_state.sources_shown:
+        # نموذج لإنشاء الأسئلة
+        with st.form(key='questions_form'):
+            question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+            questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
+            generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+
+            if generate_questions_button:
+                question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+                questions = generate_questions_endpoint(question_request)
+                st.write("الاختبار:", questions)

@@ -46,6 +46,9 @@ if "reference_texts_store" not in st.session_state:
 if "document_store" not in st.session_state:
     st.session_state.document_store = []
 
+if "response_text" not in st.session_state:
+    st.session_state.response_text = ""
+
 # Function Definitions
 
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
@@ -165,23 +168,30 @@ def generate_response(query_request: QueryRequest):
     )
     
     response = get_response(context, query_request.query, model)
-    st.session_state.vector_stores["response_text"] = response  # Store the response for later use
+    st.session_state.response_text = response  # Store the response text for generating questions
     return response
 
-def generate_questions(context, num_questions, question_type, model):
+def generate_questions_from_response(num_questions, question_type, model):
+    # Use the AI-generated response text to generate questions
+    response_text = st.session_state.response_text
+    
+    if not response_text:
+        st.error("لم يتم توليد أي استجابة. يرجى توليد استجابة أولاً قبل توليد الأسئلة.")
+        return None
+
     if question_type == "MCQ":
         prompt_template = f"""
-        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على النص المرجعي المتاح.
+        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة الاختيار من متعدد (MCQs) بناءً على الإجابة التالية.
         يجب أن يحتوي كل سؤال على 4 خيارات وإجابة صحيحة. تأكد من أن الأسئلة تغطي المفاهيم الأساسية من النص.
 
-        النص المرجعي: {context}\n
+        الإجابة: {response_text}\n
         """
     else:
         prompt_template = f"""
-        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على النص المرجعي المتاح.
+        أنت مساعد ذكي متخصص في اللغة العربية. قم بتوليد {num_questions} من أسئلة صح/خطأ بناءً على الإجابة التالية.
         تأكد من أن كل سؤال يحتوي على الإجابة الصحيحة.
 
-        النص المرجعي: {context}\n
+        الإجابة: {response_text}\n
         """
 
     try:
@@ -244,19 +254,16 @@ if st.session_state.processing_complete:
 
 # Section to generate questions
 if st.session_state.processing_complete:
-    with st.form(key='questions_form'):
-        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "صح/خطأ"])
-        questions_number = st.number_input("عدد الأسئلة:", min_value=1, max_value=10)
-        generate_button = st.form_submit_button(label='توليد الأسئلة')
+    if st.session_state.response_text:
+        with st.form(key='questions_form'):
+            question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "صح/خطأ"])
+            questions_number = st.number_input("عدد الأسئلة:", min_value=1, max_value=10)
+            generate_button = st.form_submit_button(label='توليد الأسئلة')
 
-        if generate_button:
-            if "pdf_vectorstore" not in st.session_state.vector_stores:
-                st.error("يجب معالجة ملفات PDF أولاً قبل توليد الأسئلة.")
-            else:
-                context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
+            if generate_button:
                 model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
                     generation_config={"temperature": 0.2, "top_p": 1, "top_k": 1, "max_output_tokens": 8000}
                 )
-                questions = generate_questions(context, questions_number, question_type, model)
+                questions = generate_questions_from_response(questions_number, question_type, model)
                 st.write("الأسئلة المتولدة:", questions)

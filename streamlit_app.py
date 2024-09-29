@@ -123,9 +123,9 @@ def get_response(context, question, model):
     prompt = prompt_template.format(context=context, question=question)
 
     try:
-        # Use model.generate() to directly get a response
-        response = model.generate(prompt)
-        response_text = response.generations[0].text  # Adjust based on response structure
+        # Replace 'generate' with the actual method used by the API.
+        response = model.generate_text(prompt)  # This should be the correct method from your API
+        response_text = response.generations[0].text  # Adjust this based on the actual response structure
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
             for rating in response.safety_ratings:
@@ -135,9 +135,13 @@ def get_response(context, question, model):
 
         logging.info(f"AI Response: {response_text}")
         return response_text
-    except Exception as e:
-        logging.warning(e)
+    except AttributeError as e:
+        logging.warning(f"Error: {e}")
         return ""
+    except Exception as e:
+        logging.warning(f"An unexpected error occurred: {e}")
+        return ""
+
 
 def generate_response(query_request: QueryRequest):
     if "pdf_vectorstore" not in st.session_state.vector_stores:
@@ -214,8 +218,8 @@ def extract_reference_texts_as_json(response_text, context):
     )
 
     try:
-        # Generate the reference response directly
-        ref_response = model.generate(ref_prompt)
+        # Replace 'generate' with the actual method used by the API.
+        ref_response = model.generate_text(ref_prompt)  # This should be the correct method from your API
         ref_response_text = ref_response.generations[0].text.strip()
 
         # Logging for debugging
@@ -230,10 +234,13 @@ def extract_reference_texts_as_json(response_text, context):
 
         return reference_texts_json
 
-    except Exception as e:
-        logging.warning(f"Error generating reference texts: {e}")
+    except AttributeError as e:
+        logging.warning(f"Error: {e}")
         return None
-
+    except Exception as e:
+        logging.warning(f"An unexpected error occurred: {e}")
+        return None
+        
 def generate_reference_texts():
     if "pdf_vectorstore" not in st.session_state.vector_stores or "response_text" not in st.session_state.vector_stores or "relevant_content" not in st.session_state.vector_stores:
         raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")

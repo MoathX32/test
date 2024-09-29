@@ -291,37 +291,42 @@ with st.expander("إرشادات الاستخدام"):
 
 st.write("---")
 
+# Global variables to store the vector store and documents
+pdf_vectorstore = None
+documents = None
+
 # Process lessons and video
 if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
     with st.spinner('جاري معالجة الملفات...'):
-       pdf_vectorstore, documents = process_lessons_and_video()  
+        pdf_vectorstore, documents = process_lessons_and_video()  
     st.success("تمت معالجة الملفات بنجاح!")
 
 st.write("---")
 
 # Handle question form
-with st.form(key='response_form'):
-    query = st.text_input("كيف يمكنني مساعدتك:")
-    response_button = st.form_submit_button(label='أجب')
+if pdf_vectorstore is not None:
+    with st.form(key='response_form'):
+        query = st.text_input("كيف يمكنني مساعدتك:")
+        response_button = st.form_submit_button(label='أجب')
 
-    if response_button:
-        query_request = QueryRequest(query=query)
-        response, relevant_content = generate_response(query_request, pdf_vectorstore)
-        st.write("الرد:", response)
+        if response_button:
+            query_request = QueryRequest(query=query)
+            response, relevant_content = generate_response(query_request, pdf_vectorstore)
+            st.write("الرد:", response)
 
-        # Generate reference texts
-        reference_texts = generate_reference_texts(response, relevant_content)
-        st.write("النصوص المرجعية:", reference_texts)
+            # Generate reference texts
+            reference_texts = generate_reference_texts(response, relevant_content)
+            st.write("النصوص المرجعية:", reference_texts)
 
-st.write("---")
+    st.write("---")
 
-# Generate questions
-with st.form(key='questions_form'):
-    question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-    questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
-    generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
+    # Generate questions
+    with st.form(key='questions_form'):
+        question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
+        questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
+        generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
 
-    if generate_questions_button:
-        question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-        questions = generate_questions_endpoint(question_request, reference_texts)
-        st.write("الاختبار:", questions)
+        if generate_questions_button:
+            question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
+            questions = generate_questions_endpoint(question_request, reference_texts)
+            st.write("الاختبار:", questions)

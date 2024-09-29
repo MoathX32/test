@@ -19,52 +19,47 @@ import re
 logging.basicConfig(level=logging.INFO)
 
 # Load environment variables
-# Load environment variables
 load_dotenv()
 genai_api_key = os.getenv("GENAI_API_KEY")
 
 # Configure GenAI
 genai.configure(api_key=genai_api_key)
 
-
-
 # Initialize session state variables
-st.session_state.setdefault("processing_complete", False)
-st.session_state.setdefault("response_submitted", False)
-st.session_state.setdefault("sources_shown", False)
-st.session_state.setdefault("vector_stores", {})
-st.session_state.setdefault("reference_texts_store", {})
-st.session_state.setdefault("document_store", [])
+if "processing_complete" not in st.session_state:
+    st.session_state.processing_complete = False
 
-# Helper to create a Generative Model
-def create_generative_model():
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
-        generation_config={
-            "temperature": 0.2,
-            "top_p": 1,
-            "top_k": 1,
-            "max_output_tokens": 8000,
-        },
-        system_instruction="You are a helpful document answering assistant."
-    )
+if "response_submitted" not in st.session_state:
+    st.session_state.response_submitted = False
+
+if "sources_shown" not in st.session_state:
+    st.session_state.sources_shown = False
+
+if "vector_stores" not in st.session_state:
+    st.session_state.vector_stores = {}
+
+if "reference_texts_store" not in st.session_state:
+    st.session_state.reference_texts_store = {}
+
+if "document_store" not in st.session_state:
+    st.session_state.document_store = []
 
 # Function Definitions
 def get_single_pdf_chunks(pdf_bytes, filename, text_splitter):
     if not pdf_bytes:
-        raise HTTPException(status_code=400, detail=f"Empty PDF content in file {filename}")
+        raise HTTPException(status_code=400, detail="Empty PDF content.")
         
     pdf_stream = io.BytesIO(pdf_bytes)
     pdf_reader = PdfReader(pdf_stream)
-    
-    pdf_chunks = [
-        Document(page_content=chunk, metadata={"page": page_num, "filename": filename})
-        for page_num, page in enumerate(pdf_reader.pages)
-        if (page_text := page.extract_text())
-        for chunk in text_splitter.split_text(page_text)
-    ]
-
-    logging.info(f"Extracted {len(pdf_chunks)} chunks from {filename}")
+    pdf_chunks = []
+    for page_num, page in enumerate(pdf_reader.pages):
+        page_text = page.extract_text()
+        if page_text:
+            page_chunks = text_splitter.split_text(page_text)
+            for chunk in page_chunks:
+                document = Document(page_content=chunk, metadata={"page": page_num, "filename": filename})
+                logging.info(f"Adding document chunk with metadata: {document.metadata}")
+                pdf_chunks.append(document)
     return pdf_chunks
 
 def get_all_pdfs_chunks(pdf_docs_with_names):
@@ -93,8 +88,8 @@ def get_vector_store(documents):
         vectorstore = FAISS.from_documents(documents=documents, embedding=embeddings)
         return vectorstore
     except Exception as e:
-        logging.warning(f"Issue with creating the vector store: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Issue with creating the vector store for documents: {str(e)}")
+        logging.warning("Issue with creating the vector store.")
+        raise HTTPException(status_code=500, detail="Issue with creating the vector store.")
 
 def process_lessons_and_video():
     folder_path = "./Data"  # Automatically set to the "Data" folder in the current directory
@@ -118,13 +113,11 @@ def get_response(context, question, model):
     chat_session = model.start_chat(history=[])
 
     prompt_template = """
-    أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
-    لاتجب الا اذا كان السؤال واضح او استفهم من الطالب المقصود
-    أجب على السؤال التالي من خلال فهمك النص الموجود في السياق المرجعي . قدم إجابة بسيطة وواضحة تتناسب مع مستوى الصفوف الأولى.
-    يجب أن يكون الرد مفهومًا.
-    لا تجب على أي سؤال خارج فهمك سياق النص.
-    السياق: {context}\n
-    السؤال: {question}\n
+    You are an AI assistant dedicated to answering questions based on the provided context.
+    Answer the following question based on the reference context below.
+
+    Context: {context}\n
+    Question: {question}\n
     """
 
     try:
@@ -140,7 +133,7 @@ def get_response(context, question, model):
         logging.info(f"AI Response: {response_text}")
         return response_text
     except Exception as e:
-        logging.warning(f"Error in get_response: {e}")
+        logging.warning(e)
         return ""
 
 def generate_response(query_request: QueryRequest):
@@ -156,208 +149,56 @@ def generate_response(query_request: QueryRequest):
 
     context = " ".join([doc.page_content for doc in relevant_content])
 
-    model = create_generative_model()
+    generation_config = {
+        "temperature": 0.2,
+        "top_p": 1,
+        "top_k": 1,
+        "max_output_tokens": 8000,
+    }
+
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=generation_config,
+        system_instruction="You are a helpful document answering assistant."
+    )
     
     response = get_response(context, query_request.query, model)
     st.session_state.vector_stores["response_text"] = response  # Store the response for later use
     return response
 
-def clean_json_response(response_text):
-    try:
-        response_json = json.loads(response_text)
-        return response_json
-    except json.JSONDecodeError:
-        try:
-            cleaned_text = re.sub(r'```json', '', response_text).strip()
-            cleaned_text = re.sub(r'```', '', cleaned_text).strip()
-
-            match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
-            if match:
-                cleaned_text = match.group(0)
-                response_json = json.loads(cleaned_text)
-                return response_json
-            else:
-                logging.error("No JSON object or array found in response")
-                return None
-        except (ValueError, json.JSONDecodeError) as e:
-            logging.error(f"Response is not a valid JSON: {str(e)}")
-            return None
-
-def extract_reference_texts_as_json(response_text, context):
-    ref_prompt = f"""
-    بناءً على الإجابة التالية، حدد النص الأكثر ارتباطًا من المستندات المرجعية الخاصة بمادة اللغة العربية.
-    قدم العنوان الرئيسي للدرس كمفتاح 'filename'، وأضف النص الأكثر ارتباطًا فقط تحت مفتاح 'relevant_texts'.
-    
-    الإجابة: {response_text}
-
-    ابحث في السياق المرجعي التالي عن المعلومات التي تدعم هذه الإجابة:
-    {context}
-
-    قدم النص الأكثر ارتباطًا مع بيان مرجعه في شكل JSON كما هو موضح أعلاه.
-    """
-
-    chat_session = create_generative_model().start_chat(history=[])
-    
-    ref_response = chat_session.send_message(ref_prompt)
-    ref_response_text = ref_response.text.strip()
-
-    logging.info(f"Reference response text: {ref_response_text}")
-
-    reference_texts_json = clean_json_response(ref_response_text)
-    
-    if reference_texts_json is None:
-        logging.warning("Failed to parse JSON from reference response.")
-    else:
-        logging.info(f"Parsed reference texts JSON: {reference_texts_json}")
-    
-    return reference_texts_json
-
-def generate_reference_texts():
-    if not all(k in st.session_state.vector_stores for k in ["pdf_vectorstore", "response_text", "relevant_content"]):
-        raise HTTPException(status_code=400, detail="PDFs, response, and relevant content must be processed first.")
-    
-    response_text = st.session_state.vector_stores['response_text']
-
-    context = " ".join([doc.page_content for doc in st.session_state.vector_stores["relevant_content"]])
-
-    reference_texts = extract_reference_texts_as_json(response_text, context)
-    
-    if reference_texts is None:
-        logging.warning("No relevant reference texts found.")
-        st.session_state.reference_texts_store["last_reference_texts"] = None
-    else:
-        st.session_state.reference_texts_store["last_reference_texts"] = {"reference_texts": reference_texts}
-    
-    return reference_texts
-
-class QuestionRequest(BaseModel):
-    question_type: str
-    questions_number: int
-
-def generate_questions(relevant_text, num_questions, question_type, model):
-    if not relevant_text.strip():
-        logging.warning("Relevant text is empty or invalid.")
-        st.error("Relevant text is empty or invalid.")
-        return None
-
-    if question_type == "MCQ":
-        prompt_template = f"""
-        You are an AI assistant tasked with generating exactly {num_questions} multiple-choice questions (MCQs) from the given context. 
-        Create a set of MCQs with 4 answer options each. Ensure that the questions cover key concepts from the context provided.
-        The questions should be formatted in JSON with fields 'question', 'options', and 'correct_answer'.
-        
-        Context: {relevant_text}\n
-        """
-    else:
-        prompt_template = f"""
-        You are an AI assistant tasked with generating exactly {num_questions} true/false questions from the given context. 
-        The questions should be formatted in JSON with fields 'question' and 'correct_answer'. 
-        
-        Context: {relevant_text}\n
-        """
-
-    try:
-        response = model.start_chat(history=[]).send_message(prompt_template)
-        response_text = response.text.strip()
-
-        logging.info(f"Model Response: {response_text}")
-
-        if response_text:
-            response_json = clean_json_response(response_text)
-            return response_json if response_json else None
-        else:
-            logging.warning("Received an empty response from the model.")
-            st.error("Received an empty response from the model.")
-            return None
-    except Exception as e:
-        logging.warning(f"Error: {e}")
-        st.error(f"Error generating questions: {e}")
-        return None
-    
-def generate_questions_endpoint(question_request: QuestionRequest):
-    if "last_reference_texts" not in st.session_state.reference_texts_store:
-        raise HTTPException(status_code=400, detail="No reference texts found. Please process the reference texts first.")
-    
-    reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
-    
-    if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], dict):
-        relevant_texts = reference_texts["reference_texts"].get("relevant_texts", "")
-        
-        if not relevant_texts.strip():
-            logging.error("Relevant texts are empty or invalid.")
-            st.error("النصوص المرجعية غير صحيحة.")
-            return None
-
-        logging.info(f"Relevant texts extracted: {relevant_texts}")
-    else:
-        st.error("النصوص المرجعية غير صحيحة.")
-        logging.error(f"Reference texts structure: {reference_texts}")
-        return None
-
-    questions_json = generate_questions(
-        relevant_text=relevant_texts,
-        num_questions=question_request.questions_number,
-        question_type=question_request.question_type,
-        model=create_generative_model()
-    )
-
-    return questions_json
-
 # Streamlit UI Components
-st.title("مرحبا بك! أنا مساعد مادة اللغة العربية للصف الرابع")
 
-# إرشادات الاستخدام
-with st.expander("إرشادات الاستخدام"):
+st.title("Welcome! I'm an AI assistant for learning materials")
+
+# Use the Streamlit expander to show instructions
+with st.expander("How to use this assistant"):
     st.write("""
-    **تنبيه:**
-    البرنامج مازال تحت التجريب وقد يحتوي على بعض الأخطاء أو الميزات غير المكتملة. نقدر تفهمك وأي ملاحظات قد تساعد في تحسين الأداء.
-
-    **إرشادات المستخدم لواجهة Streamlit:**
-    1. **تشغيل المساعد:**
-       عند فتح واجهة Streamlit، ستجد زرًا بعنوان "ابدأ تشغيل المساعد". بالضغط على هذا الزر، يبدأ البرنامج في معالجة ملفات PDF الموجودة في مجلد Data.
-    2. **طرح سؤال:**
-       في الجزء المخصص للأسئلة، يمكنك إدخال سؤالك في حقل النص "كيف يمكنني مساعدتك". بعد إدخال السؤال، اضغط على زر "أجب". سيقوم البرنامج بمعالجة سؤالك بناءً على النصوص المستخرجة من ملفات PDF ويعرض الرد في الأسفل.
-    3. **إنشاء أسئلة اختبار:**
-       في قسم إنشاء الأسئلة، اختر نوع السؤال الذي ترغب في إنشائه (اختيارات متعددة "MCQ" أو صح/خطأ "True/False").
-       حدد عدد الأسئلة باستخدام المؤشر، ثم اضغط على "ابدأ وضع الاختبار". سيتم عرض الأسئلة المتولدة بناءً على النصوص المرجعية.
+    **Instructions:**
+    - Start the assistant to process PDFs in the "Data" folder.
+    - Ask any question related to the material in the PDFs.
+    - Generate multiple choice or true/false questions from the PDFs.
     """)
 
 st.write("---")
 
-if st.button('🚀 ابدأ تشغيل المساعد 🚀'):
-    with st.spinner('جاري معالجة الملفات...'):
-       process_lessons_and_video()  # Call the function to process files
-    st.session_state.processing_complete = True  # Update processing state
+# Button to trigger the lesson and video processing
+if st.button('🚀 Start the Assistant 🚀'):
+    with st.spinner('Processing files...'):
+       process_lessons_and_video()  # Call the function to process PDFs
+    st.session_state.processing_complete = True  # Update session state
 
 st.write("---")
 
+# After processing, show the query input and response generation
 if st.session_state.processing_complete:
     with st.form(key='response_form'):
-        query = st.text_input("كيف يمكنني مساعدتك:")
-        response_button = st.form_submit_button(label='أجب')
+        query = st.text_input("Ask your question:")
+        response_button = st.form_submit_button(label='Submit')
 
         if response_button:
             query_request = QueryRequest(query=query)
             response = generate_response(query_request)
-            st.write("الرد:", response)
-            st.session_state.response_submitted = True
+            st.write("Response:", response)
+            st.session_state.response_submitted = True  # Update session state
 
-    st.write("---")
-
-    if st.session_state.response_submitted:
-        reference_texts = generate_reference_texts()
-        if reference_texts is not None:
-            st.session_state.sources_shown = True
-
-    st.write("---")
-
-    if st.session_state.sources_shown:
-        with st.form(key='questions_form'):
-            question_type = st.selectbox("اختر نوع السؤال:", ["MCQ", "True/False"])
-            questions_number = st.number_input("اختر عدد الأسئلة:", min_value=1, max_value=30)
-            generate_questions_button = st.form_submit_button(label='ابدأ وضع الاختبار')
-
-            if generate_questions_button:
-                question_request = QuestionRequest(question_type=question_type, questions_number=questions_number)
-                questions = generate_questions_endpoint(question_request)
-                st.write("الاختبار:", questions)
+st.write("---")

@@ -256,9 +256,6 @@ def clean_json_response(response_text):
                         # Escape inner double quotes that are not part of the JSON syntax
             cleaned_text = re.sub(r'\"([^\"]+?)\"', r'"\1"', cleaned_text)
             
-            # Replace any improperly placed quotation marks within text fields
-            cleaned_text = cleaned_text.replace('""', '"').replace('"،', '",')
-
             match = re.search(r'(\{.*\}|\[.*\])', cleaned_text, re.DOTALL)
             if match:
                 cleaned_text = match.group(0)

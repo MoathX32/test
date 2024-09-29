@@ -110,8 +110,6 @@ class QueryRequest(BaseModel):
     query: str
 
 def get_response(context, question, model):
-    chat_session = model.start_chat(history=[])
-
     prompt_template = """
     أنت مساعد ذكي في مادة اللغة العربية للصفوف الأولى. تفهم أساسيات اللغة العربية مثل الحروف، الكلمات البسيطة، والجمل الأساسية.
     لاتجب الا اذا كان السؤال واضح او استفهم من الطالب المقصود
@@ -122,9 +120,9 @@ def get_response(context, question, model):
     السؤال: {question}\n
     """
 
-
     try:
-        response = chat_session.send_message(prompt_template.format(context=context, question=question))
+        # Directly send the query to the model without a chat session or history
+        response = model.send_message(prompt_template.format(context=context, question=question))
         response_text = response.text
 
         if hasattr(response, 'safety_ratings') and response.safety_ratings:
@@ -203,7 +201,7 @@ def extract_reference_texts_as_json(response_text, context):
     قدم النص الأكثر ارتباطًا مع بيان مرجعه في شكل JSON كما هو موضح أعلاه.
     """
 
-    chat_session = genai.GenerativeModel(
+    model = genai.GenerativeModel(
         model_name="gemini-1.5-pro-latest",
         generation_config={
             "temperature": 0.2,
@@ -211,12 +209,12 @@ def extract_reference_texts_as_json(response_text, context):
             "top_k": 1,
             "max_output_tokens": 8000,
         }
-    ).start_chat(history=[])
+    )
     
-    ref_response = chat_session.send_message(ref_prompt)
+    ref_response = model.send_message(ref_prompt)
     ref_response_text = ref_response.text.strip()
 
-    # تسجيل النص المستلم لفحصه
+    # Logging for debugging
     logging.info(f"Reference response text: {ref_response_text}")
 
     reference_texts_json = clean_json_response(ref_response_text)
@@ -250,7 +248,6 @@ class QuestionRequest(BaseModel):
     question_type: str
     questions_number: int
 
-
 def generate_questions(relevant_text, num_questions, question_type, model):
     if not relevant_text.strip():
         logging.warning("Relevant text is empty or invalid.")
@@ -274,7 +271,7 @@ def generate_questions(relevant_text, num_questions, question_type, model):
         """
 
     try:
-        response = model.start_chat(history=[]).send_message(prompt_template)
+        response = model.send_message(prompt_template)
         response_text = response.text.strip()
 
         logging.info(f"Model Response: {response_text}")
@@ -297,7 +294,6 @@ def generate_questions_endpoint(question_request: QuestionRequest):
     
     reference_texts = st.session_state.reference_texts_store.get("last_reference_texts", {})
     
-    # Ensure that the reference texts are properly extracted
     if "reference_texts" in reference_texts and isinstance(reference_texts["reference_texts"], dict):
         relevant_texts = reference_texts["reference_texts"].get("relevant_texts", "")
         
